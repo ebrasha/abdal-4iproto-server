@@ -1,90 +1,183 @@
-# Abdal 4iProto server management version
+# Abdal 4iProto Server
 
-![](https://raw.githubusercontent.com/ebrasha/abdal-4iproto-server-config/main/shot.jpg)
+<div align="center">
+  <img src="src.png" alt="Abdal 4iProto Server" width="600">
+</div>
 
-# 🤵 Programmer
-Ebrahim Shafiei (EbraSha)
+A high-performance SSH-based tunneling server designed for secure internet access, built with advanced security features and traffic monitoring capabilities.
 
-Email :  Prof.Shafiei@Gmail.com
+**📖 [فارسی](README.fa.md) | [English](README.md)**
 
-## README Translation
-- [English](README.md)
-- [فارسی](README.fa.md)
+## 🚀 Features
 
- ## 💎 General purpose
-The 4iProto protocol software server, used for the internet without censorship and privacy protection.
+### 🔒 Security Features
+- **Built-in Brute Force Protection**: Automatic IP blocking after failed authentication attempts
+- **Attack Monitoring**: Detailed logging of failed login attempts with IP tracking
+- **Customizable Authentication**: Configurable maximum authentication attempts
+- **IP Blocking System**: Persistent blocked IP management with JSON storage
+- **Server Banner Customization**: Hide or customize server banner via configuration
 
+### 📊 Traffic Monitoring
+- **Real-time Traffic Tracking**: Monitor upload/download usage per user
+- **Session-based Statistics**: Track bytes sent/received per session
+- **Total Usage Analytics**: Cumulative traffic statistics across all sessions
+- **Automatic Data Persistence**: Traffic data saved to JSON files every 10 seconds
+- **Live Bandwidth Monitoring**: Real-time bandwidth usage display
 
-# ✨ Features
-- Without any malicious code and spyware
-- Smart and automatic installation
-- Installation of prerequisites
-- Automatic server configuration
-- Creating a user account
-- Delete Account (User
-- List of accounts
-- Change user password
-- Viewing the time of creating a user account
-- Automatic remover
-- Completely open source
+### 🌐 Network Capabilities
+- **Multi-port Support**: Run server on multiple ports simultaneously
+- **TCP Forwarding**: Direct TCP connection forwarding without additional configuration
+- **UDP Forwarding**: Full UDP traffic forwarding support
+- **Cross-platform**: Runs on both Linux and Windows systems
+- **High Performance**: 10x faster than OpenSSH for tunneling operations
 
+### 🛠️ Management Features
+- **User Management**: JSON-based user authentication system
+- **Shell Integration**: Native CMD support on Windows and Shell on Linux
+- **Configuration Management**: JSON-based server configuration
+- **Logging System**: Comprehensive logging of connections and attacks
 
-If, you are interested in free projects and helping the people of the world, send a message so that we can build a better world together._
-_
+## 📋 Requirements
 
-# 💡 Installation
+- Go 1.19 or higher
+- SSH private key (`id_rsa`)
+- Configuration files (see Setup section)
 
-#### For all operating systems
+## ⚙️ Setup
+
+### 1. Configuration Files
+
+#### `server_config.json`
+```json
+{
+  "ports": [22, 2222, 2223],
+  "shell": "cmd.exe",
+  "max_auth_attempts": 3,
+  "server_version": "SSH-2.0-Abdal-4iProto-Server"
+}
 ```
-bash <(curl -Ls  https://raw.githubusercontent.com/ebrasha/abdal-4iproto-server-config/main/abdal-4iproto-server-config-installer.sh)
+
+#### `users.json`
+```json
+{
+  "username1": "password1",
+  "username2": "password2"
+}
+```
+
+### 2. SSH Key Setup
+Place your SSH private key as `id_rsa` in the project directory.
+
+### 3. Build and Run
+```bash
+go mod tidy
+go build -o abdal-4iproto-server
+./abdal-4iproto-server
+```
+
+## 📁 File Structure
+
+```
+abdal-4iproto-server/
+├── main.go                 # Main server application
+├── server_config.json      # Server configuration
+├── users.json             # User credentials
+├── id_rsa                 # SSH private key
+├── blocked_ips.json       # Blocked IP addresses
+├── invalid_logins.log     # Failed login attempts
+└── traffic_*.json         # Per-user traffic statistics
+```
+
+## 🔧 Configuration Options
+
+### Server Configuration (`server_config.json`)
+- `ports`: Array of ports to listen on
+- `shell`: Shell command to execute (cmd.exe for Windows, /bin/bash for Linux)
+- `max_auth_attempts`: Maximum failed login attempts before IP blocking
+- `server_version`: Custom SSH server version string
+
+### Traffic Monitoring
+The server automatically tracks:
+- Bytes sent/received per session
+- Total traffic per user
+- Session timestamps
+- Real-time bandwidth usage
+
+## 🚀 Usage
+
+### To generate a new key on the server:
+Run the following command in the server's file directory to generate a new key.
+
+```bash
+ssh-keygen -t rsa -b 4096 -f id_rsa
 ```
 
 
-# 💣 Clean uninstall
-
-#### For all operating systems
-
-```
-bash <(curl -Ls   https://raw.githubusercontent.com/ebrasha/abdal-4iproto-server-config/main/abdal-4iproto-server-config-uninstaller.sh)
+### Starting the Server
+```bash
+./abdal-4iproto-server
 ```
 
-## ✅ Supported operating systems
+### Connecting via Custom Client
+We have developed a dedicated client with GUI support that also supports SOCKS5 server creation. For the best experience, use our custom client:
 
-- debian.11-x64
-- debian.11-arm64
-- debian.10-x64
-- ubuntu.22.04-x64
-- ubuntu.22.04-arm64
-- ubuntu.20.04-x64
-- ubuntu.18.04-x64
-- centos.7-x64
-- rhel.7-x64
-- rhel.8-x64
-- fedora.37-x64
+**Download Client**: [Abdal 4iProto Client](https://github.com/ebrasha/abdal-4iproto-client)
 
-# ⛩️ Required ports
+### Alternative: Standard SSH Connection
+```bash
+ssh -D 1080 username@server_ip -p 22
+```
 
-1. [x] 49601
-2. [x] 49602
-3. [x] 49603
-4. [x] 49706
+### SOCKS Proxy Usage
+After establishing connection with dynamic forwarding:
+- Configure applications to use SOCKS proxy on localhost:1080
+- All traffic will be tunneled through the secure SSH connection
 
-# 🧲 Related projects
-1. [Abdal Socks Bridge For Client](https://github.com/ebrasha/abdal-socks-bridge)
+## 📊 Monitoring
 
+### Traffic Statistics
+Traffic data is automatically saved to `traffic_username.json` files:
+```json
+{
+  "username": "user1",
+  "ip": "192.168.1.100",
+  "last_bytes_sent": 1024,
+  "last_bytes_received": 2048,
+  "total_bytes_sent": 1048576,
+  "total_bytes_received": 2097152,
+  "total_bytes": 3145728,
+  "last_timestamp": "2025-01-15T10:30:00Z"
+}
+```
 
- ## ⚠️ Legal disclaimer ⚠️
+### Log Files
+- `invalid_logins.log`: Records failed authentication attempts
+- `blocked_ips.json`: Manages blocked IP addresses
+- Console output: Real-time connection and traffic logs
 
-The Abdal 4iProto protocol project is a production based on security and correct use for scientific advancements, any malicious use of this system outside the local laws of your country is beyond the responsibility of the Abdal team.
-## ❤️ Donations to the project 
+## 🔒 Security Features
 
-> USDT:      TKRmTvwkMFdgGrwvDHztLXsKAwK2WEEKUp
+### Brute Force Protection
+- Automatic IP blocking after configurable failed attempts
+- Persistent blocked IP storage
+- Detailed attack logging with timestamps
 
-> bitcoin:   bc1q9w9ymgz2wluax60rsuza4q0at7gpy82g8el6zj
+### Attack Monitoring
+- Logs failed login attempts with username, password, and IP
+- Tracks attack patterns and sources
+- Provides comprehensive security analytics
 
-> For Iranian People -> MellatBank : 6104-3378-5301-4247
+## 🐛 Reporting Issues
+If you encounter any issues or have configuration problems, please reach out via email at Prof.Shafiei@Gmail.com. You can also report issues on GitLab or GitHub.
 
-## ❗ Reporting Issues 
+## ❤️ Donation
+If you find this project helpful and would like to support further development, please consider making a donation:
+- [Donate Here](https://alphajet.ir/abdal-donation)
 
-If you are facing a configuration issue or something is not working as you expected to be, please use the Prof.Shafiei@Gmail.com . Issues on GitLab are also welcomed.
+## 🤵 Programmer
+Handcrafted with Passion by **Ebrahim Shafiei (EbraSha)**
+- **E-Mail**: Prof.Shafiei@Gmail.com
+- **Telegram**: [@ProfShafiei](https://t.me/ProfShafiei)
 
+## 📜 License
+This project is licensed under the GPLv2 or later License. 
