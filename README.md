@@ -68,6 +68,12 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 ### 2. SSH Key Setup
 Place your SSH private key as `id_rsa` in the project directory.
 
+Run the following command in the server's file directory to generate a new key.
+
+```bash
+ssh-keygen -t rsa -b 4096 -f id_rsa
+```
+
 ### 3. Build and Run
 ```bash
 go mod tidy
@@ -104,14 +110,7 @@ The server automatically tracks:
 - Real-time bandwidth usage
 
 ## 🚀 Usage
-
-### To generate a new key on the server:
-Run the following command in the server's file directory to generate a new key.
-
-```bash
-ssh-keygen -t rsa -b 4096 -f id_rsa
-```
-
+ 
 
 ### Starting the Server
 ```bash
