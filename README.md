@@ -157,18 +157,7 @@ go build -o abdal-4iproto-server
 ./abdal-4iproto-server
 ```
 
-## 📁 File Structure
 
-```
-abdal-4iproto-server/
-├── main.go                 # Main server application
-├── server_config.json      # Server configuration
-├── users.json             # User credentials
-├── id_rsa                 # SSH private key
-├── blocked_ips.json       # Blocked IP addresses
-├── invalid_logins.log     # Failed login attempts
-└── traffic_*.json         # Per-user traffic statistics
-```
 
 ## 🔧 Configuration Options
 
