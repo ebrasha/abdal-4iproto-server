@@ -16,6 +16,7 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Customizable Authentication**: Configurable maximum authentication attempts
 - **IP Blocking System**: Persistent blocked IP management with JSON storage
 - **Server Banner Customization**: Hide or customize server banner via configuration
+- **Setting Access Levels**: Has two modes: User and Administrator. Administrators have the capability to execute commands in the operating system shell, while Users can only establish tunnels.
 
 ### 📊 Traffic Monitoring
 - **Real-time Traffic Tracking**: Monitor upload/download usage per user
@@ -23,6 +24,8 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Total Usage Analytics**: Cumulative traffic statistics across all sessions
 - **Automatic Data Persistence**: Traffic data saved to JSON files every 10 seconds
 - **Live Bandwidth Monitoring**: Real-time bandwidth usage display
+- **Blocking Unauthorized Websites**: Blocks websites that you do not want the user to visit.
+- **Blocking Unauthorized IPs**: Blocks IP addresses that you do not want the user to visit.
 
 ### 🌐 Network Capabilities
 - **Multi-port Support**: Run server on multiple ports simultaneously
