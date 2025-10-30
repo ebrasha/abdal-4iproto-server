@@ -207,8 +207,33 @@ ssh -D 1080 username@server_ip -p 22
 
 ### SOCKS Proxy Usage
 After establishing connection with dynamic forwarding:
-- Configure applications to use SOCKS proxy on localhost:1080
+- Configure applications to use SOCKS proxy on localhost:52905
 - All traffic will be tunneled through the secure SSH connection
+
+## 🚀 4iProto Client Options
+
+You can connect to the **Abdal 4iProto Server** from all major platforms using the following clients:
+
+### 🐧 Linux Client
+
+Use [`sshuttle`](https://github.com/sshuttle/sshuttle) for full-tunnel routing via SSH:
+
+```bash
+sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
+```
+
+### 🪟 Windows Client
+
+[Download Abdal 4iProto Client for Windows](https://github.com/ebrasha/abdal-4iproto-client)
+
+### 🤖 Android Client
+
+[Download NapsternetV from Google Play](https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv&hl=en)
+
+### 🍏 iPhone (iOS) Client
+
+[Download SSH Tunnel with SOCKS5 Proxy from App Store](https://apps.apple.com/de/app/ssh-tunnel-with-socks5-proxy/id1260223542)
+
 
 ## 📊 Monitoring
 
