@@ -26,6 +26,7 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Live Bandwidth Monitoring**: Real-time bandwidth usage display
 - **Blocking Unauthorized Websites**: Blocks websites that you do not want the user to visit.
 - **Blocking Unauthorized IPs**: Blocks IP addresses that you do not want the user to visit.
+- **Tracking Visited Websites**: The ability to track the websites visited by the user, a feature you can enable or disable
 
 ### 🌐 Network Capabilities
 - **Multi-port Support**: Run server on multiple ports simultaneously
