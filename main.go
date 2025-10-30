@@ -36,6 +36,9 @@ import (
 var trafficMap sync.Map // key: username, value: *TrafficStats
 var activeConnections sync.Map // key: connection ID, value: connection info
 
+// Session metadata storage: sessionID -> connection metadata for session management
+var sessionMetadata sync.Map // key: sessionID, value: sessionInfo (username, ip, etc.)
+
 // SetExecutableDir changes current working directory to exe dir and returns it.
 func SetExecutableDir() (string, error) {
 	exePath, err := os.Executable()
@@ -94,12 +97,14 @@ type TrafficStats struct {
 
 // User structure with role-based access control, domain/IP blocking, and logging
 type User struct {
-	Username       string   `json:"username"`
-	Password       string   `json:"password"`
-	Role           string   `json:"role"`            // "user" or "admin"
-	BlockedDomains []string `json:"blocked_domains"` // List of blocked domains/IPs with wildcard support
-	BlockedIPs     []string `json:"blocked_ips"`     // List of blocked IPs with wildcard support
-	Log            string   `json:"log"`             // "yes" or "no" - enable/disable user access logging
+	Username          string   `json:"username"`
+	Password          string   `json:"password"`
+	Role              string   `json:"role"`                   // "user" or "admin"
+	BlockedDomains    []string `json:"blocked_domains"`        // List of blocked domains/IPs with wildcard support
+	BlockedIPs        []string `json:"blocked_ips"`             // List of blocked IPs with wildcard support
+	Log               string   `json:"log"`                    // "yes" or "no" - enable/disable user access logging
+	MaxSessions       int      `json:"max_sessions"`           // Maximum number of concurrent sessions (default: 2)
+	SessionTTLSeconds int      `json:"session_ttl_seconds"`     // Session TTL in seconds (default: 300)
 }
 
 var users map[string]User
@@ -139,6 +144,13 @@ func loadUsers(path string) {
 		// New format: array of User objects
 		users = make(map[string]User)
 		for _, user := range userList {
+			// Set default values if not specified
+			if user.MaxSessions <= 0 {
+				user.MaxSessions = 2 // Default max sessions
+			}
+			if user.SessionTTLSeconds <= 0 {
+				user.SessionTTLSeconds = 300 // Default TTL: 5 minutes (300 seconds)
+			}
 			users[user.Username] = user
 		}
 		log.Printf("✅ Loaded %d users with role-based access control", len(users))
@@ -155,9 +167,11 @@ func loadUsers(path string) {
 	users = make(map[string]User)
 	for username, password := range oldUserPass {
 		users[username] = User{
-			Username: username,
-			Password: password,
-			Role:     "user", // Default role for backward compatibility
+			Username:          username,
+			Password:          password,
+			Role:              "user",     // Default role for backward compatibility
+			MaxSessions:       2,           // Default max sessions
+			SessionTTLSeconds: 300,         // Default TTL: 5 minutes
 		}
 	}
 	log.Printf("✅ Loaded %d users from legacy format (all set to 'user' role)", len(users))
@@ -371,8 +385,33 @@ func createSSHConfig() *ssh.ServerConfig {
 
 			if user, ok := users[c.User()]; ok && user.Password == string(pass) {
 				delete(failedAttempts, ip) // reset count
-				log.Printf("✅ User %s (%s) authenticated from %s", c.User(), user.Role, ip)
-				return nil, nil
+				
+				// Get session manager
+				sm := GetSessionManager()
+				
+				// Get client version (before handshake, we don't have full metadata yet)
+				// We'll use IP and username for now, and update with client version in handleConnection
+				clientVersion := "SSH-2.0-Unknown" // Will be updated in handleConnection
+				
+				// Create session
+				sessionID, err := sm.CreateSession(c.User(), ip, clientVersion)
+				if err != nil {
+					log.Printf("⚠️ Failed to create session for %s: %v", c.User(), err)
+					return nil, fmt.Errorf("session creation failed")
+				}
+				
+				// Store sessionID in memory for later use in handleConnection
+				sessionMetadata.Store(c.User()+"|"+ip, sessionID)
+				
+				log.Printf("✅ User %s (%s) authenticated from %s [Session: %s]", c.User(), user.Role, ip, sessionID[:16]+"...")
+				
+				// Return sessionID in permissions for later retrieval
+				perms := &ssh.Permissions{
+					Extensions: map[string]string{
+						"session_id": sessionID,
+					},
+				}
+				return perms, nil
 			}
 
 			logInvalidLogin(c.User(), string(pass), ip, clientPort, serverPort)
@@ -482,7 +521,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 5.10
+🛡️  Welcome to Abdal 4iProto Server ver 6.2
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -515,13 +554,88 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 	}
 	defer sshConn.Close()
 
+	// Get session manager
+	sm := GetSessionManager()
+	
+	// Extract sessionID from permissions (set during PasswordCallback)
+	username := sshConn.User()
+	userIP, _, _ := net.SplitHostPort(sshConn.RemoteAddr().String())
+	clientVersionBytes := sshConn.ClientVersion()
+	clientVersion := string(clientVersionBytes)
+	
+	var sessionID string
+	// Try to get sessionID from permissions first
+	perms := sshConn.Permissions
+	if perms != nil && perms.Extensions != nil {
+		if sid, ok := perms.Extensions["session_id"]; ok {
+			sessionID = sid
+		}
+	}
+	
+	// If not found in permissions, try to get from memory (fallback)
+	if sessionID == "" {
+		if sid, ok := sessionMetadata.Load(username + "|" + userIP); ok {
+			sessionID = sid.(string)
+		}
+	}
+	
+	// Validate session if sessionID exists
+	if sessionID != "" {
+		// Check if session is valid
+		if !sm.IsSessionValid(sessionID) {
+			log.Printf("🔒 Invalid or expired session for user %s from %s, closing connection", username, userIP)
+			return // Connection will be closed by defer
+		}
+		
+		// Register connection with session manager
+		sm.RegisterConnection(sessionID, sshConn)
+		
+		// Update client version (was unknown during PasswordCallback)
+		if err := sm.UpdateSessionClientVersion(sessionID, clientVersion); err != nil {
+			log.Printf("⚠️ Failed to update session client version: %v", err)
+		}
+		
+		// Update last seen
+		if err := sm.UpdateSessionLastSeen(sessionID); err != nil {
+			log.Printf("⚠️ Failed to update session last seen: %v", err)
+		}
+		
+		// Unregister on connection close
+		defer func() {
+			sm.UnregisterConnection(sessionID)
+			sm.CloseSession(sessionID)
+		}()
+		
+		log.Printf("🔐 Session validated: %s for user %s from %s", sessionID[:16]+"...", username, userIP)
+	} else {
+		log.Printf("⚠️ No sessionID found for user %s from %s, connection may not be tracked", username, userIP)
+	}
+
 	// Track active connection
 	connID := fmt.Sprintf("%s-%d", sshConn.RemoteAddr().String(), time.Now().UnixNano())
 	activeConnections.Store(connID, sshConn.RemoteAddr().String())
 	defer activeConnections.Delete(connID)
 
-	log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
+	log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), clientVersion)
 	go ssh.DiscardRequests(reqs)
+
+	// Start periodic session last seen update if session exists
+	if sessionID != "" {
+		go func() {
+			ticker := time.NewTicker(30 * time.Second) // Update every 30 seconds
+			defer ticker.Stop()
+			for range ticker.C {
+				if !sm.IsSessionValid(sessionID) {
+					log.Printf("🔒 Session expired for user %s, stopping updates", username)
+					return
+				}
+				if err := sm.UpdateSessionLastSeen(sessionID); err != nil {
+					log.Printf("⚠️ Failed to update session last seen: %v", err)
+					return
+				}
+			}
+		}()
+	}
 
 	for newChannel := range chans {
 
@@ -962,6 +1076,10 @@ func startServer() {
 	
 	// Load existing traffic files to preserve traffic statistics across restarts
 	loadExistingTrafficFiles()
+	
+	// Initialize session manager and start cleanup routine
+	sm := GetSessionManager()
+	sm.StartCleanupRoutine()
 
 	for _, port := range serverConfig.Ports {
 		go func(p int) {

@@ -41,6 +41,13 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Configuration Management**: JSON-based server configuration
 - **Logging System**: Comprehensive logging of connections and attacks
 
+### 🧾 Accounting Features
+- **Built-in Session Control**: Administrators can define how many concurrent sessions each account can open at the same time.
+- **Automatic Session Expiration**: Each session has a defined Time To Live (TTL). Expired sessions are automatically terminated to free resources.
+- **Dynamic Connection Handling**: When the session limit is reached, new connections can be rejected or queued — fully configurable.
+- **Real-time Session Monitoring**: Tracks and logs all active sessions in real time for auditing and analytics.
+
+
 ## 📋 Requirements
 
 - Go 1.19 or higher
@@ -89,7 +96,9 @@ A high-performance SSH-based tunneling server designed for secure internet acces
     "role": "admin",
     "blocked_domains": [],
     "blocked_ips": [],
-    "log": "no"
+    "log": "no",
+    "max_sessions": 1,
+    "session_ttl_seconds": 300
   },
   {
     "username": "user1",
@@ -108,7 +117,9 @@ A high-performance SSH-based tunneling server designed for secure internet acces
       "10.0.0.*",
       "172.16.*.*"
     ],
-    "log": "yes"
+    "log": "yes",
+    "max_sessions": 2,
+    "session_ttl_seconds": 300
   },
   {
     "username": "user2",
@@ -124,7 +135,9 @@ A high-performance SSH-based tunneling server designed for secure internet acces
       "192.168.10.1",
       "10.10.10.10"
     ],
-    "log": "yes"
+    "log": "yes",
+    "max_sessions": 5,
+    "session_ttl_seconds": 300
   }
 ]
 

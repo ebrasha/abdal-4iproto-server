@@ -5,7 +5,9 @@
     "role": "admin",
     "blocked_domains": [],
     "blocked_ips": [],
-    "log": "no"
+    "log": "no",
+    "max_sessions": 1,
+    "session_ttl_seconds": 300
   },
   {
     "username": "user1",
@@ -24,7 +26,9 @@
       "10.0.0.*",
       "172.16.*.*"
     ],
-    "log": "yes"
+    "log": "yes",
+    "max_sessions": 2,
+    "session_ttl_seconds": 300
   },
   {
     "username": "user2",
@@ -40,6 +44,8 @@
       "192.168.10.1",
       "10.10.10.10"
     ],
-    "log": "yes"
+    "log": "yes",
+    "max_sessions": 5,
+    "session_ttl_seconds": 300
   }
 ]
