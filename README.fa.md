@@ -61,7 +61,7 @@
 
 
 {
-  "ports": [22, 2222, 2223],
+  "ports": [64235, 64236,64237],
   "shell": "cmd.exe",
   "max_auth_attempts": 3,
   "server_version": "SSH-2.0-Abdal-4iProto-Server"
