@@ -52,7 +52,11 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 ### 1. Configuration Files
 
 #### `server_config.json`
+#### Windows
+
 ```json
+
+
 {
   "ports": [22, 2222, 2223],
   "shell": "cmd.exe",
@@ -60,12 +64,80 @@ A high-performance SSH-based tunneling server designed for secure internet acces
   "server_version": "SSH-2.0-Abdal-4iProto-Server"
 }
 ```
+#### linux 
 
-#### `users.json`
 ```json
 {
-  "username1": "password1",
-  "username2": "password2"
+  "ports": [64235, 64236,64237],
+  "shell": "/bin/bash",
+  "max_auth_attempts": 3,
+  "server_version": "SSH-2.0-Abdal-4iProto-Server"
+}
+```
+
+
+
+
+#### `users.json`
+
+```json
+
+[
+  {
+    "username": "ebrasha",
+    "password": "152314562152",
+    "role": "admin",
+    "blocked_domains": [],
+    "blocked_ips": [],
+    "log": "no"
+  },
+  {
+    "username": "user1",
+    "password": "password123",
+    "role": "user",
+    "blocked_domains": [
+      "facebook.com",
+      "*.facebook.com",
+      "twitter.com",
+      "*.twitter.com",
+      "instagram.com",
+      "*.instagram.com"
+    ],
+    "blocked_ips": [
+      "192.168.1.100",
+      "10.0.0.*",
+      "172.16.*.*"
+    ],
+    "log": "yes"
+  },
+  {
+    "username": "user2",
+    "password": "password456",
+    "role": "user",
+    "blocked_domains": [
+      "youtube.com",
+      "*.youtube.com",
+      "netflix.com",
+      "*.netflix.com"
+    ],
+    "blocked_ips": [
+      "192.168.10.1",
+      "10.10.10.10"
+    ],
+    "log": "yes"
+  }
+]
+
+```
+
+#### `blocked_ips.json`
+
+```json
+{
+  "blocked": [
+    "192.168.1.12",
+    "10.0.0.7"
+  ]
 }
 ```
 
