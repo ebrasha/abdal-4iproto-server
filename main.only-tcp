@@ -1,0 +1,295 @@
+// Programmer       : Ebrahim Shafiei (EbraSha)
+// Email            : Prof.Shafiei@Gmail.com
+
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/UserExistsError/conpty"
+	"golang.org/x/crypto/ssh"
+	"io"
+	"log"
+	"net"
+	"os"
+)
+
+// Change this to "powershell.exe" if needed
+
+var userPass map[string]string
+
+type ServerConfig struct {
+	Ports           []int  `json:"ports"`
+	Shell           string `json:"shell"`
+	MaxAuthAttempts int    `json:"max_auth_attempts"`
+	ServerVersion   string `json:"server_version"`
+}
+
+var serverConfig ServerConfig
+
+type BlockedIPs struct {
+	Blocked []string `json:"blocked"`
+}
+
+var blockedIPs BlockedIPs
+var failedAttempts = make(map[string]int)
+
+func loadUsers(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("Failed to read users file: %v", err)
+	}
+	err = json.Unmarshal(data, &userPass)
+	if err != nil {
+		log.Fatalf("Failed to parse users file: %v", err)
+	}
+}
+
+func loadServerConfig(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalf("Failed to read server config file: %v", err)
+	}
+	err = json.Unmarshal(data, &serverConfig)
+	if err != nil {
+		log.Fatalf("Failed to parse server config file: %v", err)
+	}
+}
+
+// start Block IPs
+
+func loadBlockedIPs() {
+	data, err := os.ReadFile("blocked_ips.json")
+	if err != nil {
+		blockedIPs = BlockedIPs{}
+		return
+	}
+	_ = json.Unmarshal(data, &blockedIPs)
+}
+
+func saveBlockedIPs() {
+	data, _ := json.MarshalIndent(blockedIPs, "", "  ")
+	_ = os.WriteFile("blocked_ips.json", data, 0644)
+}
+
+func isBlocked(ip string) bool {
+	for _, b := range blockedIPs.Blocked {
+		if b == ip {
+			return true
+		}
+	}
+	return false
+}
+
+// End Block IPs
+
+// Create SSH server config
+func createSSHConfig() *ssh.ServerConfig {
+	config := &ssh.ServerConfig{
+		ServerVersion: serverConfig.ServerVersion,
+		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+			ip, _, _ := net.SplitHostPort(c.RemoteAddr().String())
+			if isBlocked(ip) {
+				log.Printf("⛔ Blocked IP tried to connect: %s", ip)
+				return nil, fmt.Errorf("your IP is blocked")
+			}
+
+			if p, ok := userPass[c.User()]; ok && p == string(pass) {
+				delete(failedAttempts, ip) // reset count
+				return nil, nil
+			}
+
+			// افزايش تعداد تلاش ناموفق
+			failedAttempts[ip]++
+			log.Printf("❌ Failed login from %s (%d attempts)", ip, failedAttempts[ip])
+
+			if failedAttempts[ip] >= serverConfig.MaxAuthAttempts {
+				log.Printf("🚫 Blocking IP: %s", ip)
+				blockedIPs.Blocked = append(blockedIPs.Blocked, ip)
+				saveBlockedIPs()
+			}
+
+			return nil, fmt.Errorf("authentication failed")
+		},
+	}
+
+	privateBytes, err := os.ReadFile("id_rsa")
+	if err != nil {
+		log.Fatalf("Failed to load private key: %s", err)
+	}
+
+	private, err := ssh.ParsePrivateKey(privateBytes)
+	if err != nil {
+		log.Fatalf("Failed to parse private key: %s", err)
+	}
+
+	config.AddHostKey(private)
+	return config
+}
+
+// Handle SSH session using ConPTY
+func handleSession(channel ssh.Channel, requests <-chan *ssh.Request) {
+	defer channel.Close()
+	hasPty := false
+
+	for req := range requests {
+		switch req.Type {
+		case "pty-req":
+			hasPty = true
+			if req.WantReply {
+				req.Reply(true, nil)
+			}
+
+		case "shell":
+			if !hasPty {
+				if req.WantReply {
+					req.Reply(false, nil)
+				}
+				continue
+			}
+			if req.WantReply {
+				req.Reply(true, nil)
+			}
+
+			// Custom Shell
+			asciiBanner := `
+ █████╗ ██████╗ ██████╗  █████╗ ███████╗██╗  ██╗ █████╗ 
+██╔══██╗██╔══██╗██╔══██╗██╔══██╗╚══███╔╝██║  ██║██╔══██╗
+███████║██████╔╝██████╔╝███████║  ███╔╝ ███████║███████║
+██╔══██║██╔═══╝ ██╔═══╝ ██╔══██║ ███╔╝  ██╔══██║██╔══██║
+██║  ██║██║     ██║     ██║  ██║███████╗██║  ██║██║  ██║
+╚═╝  ╚═╝╚═╝     ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝
+
+🛡️  Welcome to Abdal SSH Server
+🧠  Created by: Ebrahim Shafiei (EbraSha)
+
+`
+			channel.Write([]byte(asciiBanner))
+
+			// اجرای شل با ConPTY
+
+			winDir := os.Getenv("SystemRoot")
+			fullPath := winDir + "\\System32\\" + serverConfig.Shell
+			cpty, err := conpty.Start(fullPath)
+			if err != nil {
+				log.Printf("conpty.Start error: %v", err)
+				channel.Write([]byte("❌ Failed to start terminal session\r\n"))
+				return
+			}
+			defer cpty.Close()
+
+			// تبادل ورودی/خروجی
+			go io.Copy(channel, cpty)
+			go io.Copy(cpty, channel)
+
+			// منتظر تا پایان
+			exitCode, err := cpty.Wait(context.Background())
+			log.Printf("Session exited with code %d, err=%v", exitCode, err)
+			return
+
+		default:
+			if req.WantReply {
+				req.Reply(false, nil)
+			}
+		}
+	}
+}
+
+// Handle a new SSH connection
+func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
+	// Optional banner before handshake
+	conn.Write([]byte("Abdal SSH Server\n"))
+
+	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
+	if err != nil {
+		log.Printf("Failed to handshake: %s", err)
+		return
+	}
+	defer sshConn.Close()
+
+	log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
+	go ssh.DiscardRequests(reqs)
+
+	for newChannel := range chans {
+
+		// AllowTcpForwarding
+		if newChannel.ChannelType() == "direct-tcpip" {
+			go handleDirectTCPIP(newChannel)
+			continue
+		}
+
+		if newChannel.ChannelType() != "session" {
+			newChannel.Reject(ssh.UnknownChannelType, "unsupported")
+			continue
+		}
+		channel, requests, err := newChannel.Accept()
+		if err != nil {
+			log.Printf("Channel accept failed: %v", err)
+			continue
+		}
+		go handleSession(channel, requests)
+
+	}
+}
+
+func handleDirectTCPIP(newChannel ssh.NewChannel) {
+	type directTCPIPReq struct {
+		HostToConnect     string
+		PortToConnect     uint32
+		OriginatorAddress string
+		OriginatorPort    uint32
+	}
+
+	var req directTCPIPReq
+	if err := ssh.Unmarshal(newChannel.ExtraData(), &req); err != nil {
+		newChannel.Reject(ssh.Prohibited, "could not parse direct-tcpip request")
+		return
+	}
+
+	target := fmt.Sprintf("%s:%d", req.HostToConnect, req.PortToConnect)
+	destConn, err := net.Dial("tcp", target)
+	if err != nil {
+		newChannel.Reject(ssh.ConnectionFailed, "could not connect to target")
+		return
+	}
+
+	channel, requests, err := newChannel.Accept()
+	if err != nil {
+		destConn.Close()
+		return
+	}
+
+	go ssh.DiscardRequests(requests)
+	go io.Copy(channel, destConn)
+	go io.Copy(destConn, channel)
+}
+
+// Main entry point
+func main() {
+	// Load configuration files
+	loadUsers("users.json")
+	loadServerConfig("server_config.json")
+	loadBlockedIPs()
+
+	for _, port := range serverConfig.Ports {
+		go func(p int) {
+			listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", p))
+			if err != nil {
+				log.Fatalf("Listen error on port %d: %v", p, err)
+			}
+			log.Printf("🔒 Abdal SSH Server listening on port %d", p)
+
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					log.Printf("Accept error: %v", err)
+					continue
+				}
+				go handleConnection(conn, createSSHConfig())
+			}
+		}(port)
+	}
+
+	select {}
+}

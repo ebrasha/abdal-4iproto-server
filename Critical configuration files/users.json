@@ -1,4 +1,45 @@
-{
-  "ebrasha": "95852456",
-  "admin": "21255225"
-}
+[
+  {
+    "username": "ebrasha",
+    "password": "152314562152",
+    "role": "admin",
+    "blocked_domains": [],
+    "blocked_ips": [],
+    "log": "no"
+  },
+  {
+    "username": "user1",
+    "password": "password123",
+    "role": "user",
+    "blocked_domains": [
+      "facebook.com",
+      "*.facebook.com",
+      "twitter.com",
+      "*.twitter.com",
+      "instagram.com",
+      "*.instagram.com"
+    ],
+    "blocked_ips": [
+      "192.168.1.100",
+      "10.0.0.*",
+      "172.16.*.*"
+    ],
+    "log": "yes"
+  },
+  {
+    "username": "user2",
+    "password": "password456",
+    "role": "user",
+    "blocked_domains": [
+      "youtube.com",
+      "*.youtube.com",
+      "netflix.com",
+      "*.netflix.com"
+    ],
+    "blocked_ips": [
+      "192.168.10.1",
+      "10.10.10.10"
+    ],
+    "log": "yes"
+  }
+]
