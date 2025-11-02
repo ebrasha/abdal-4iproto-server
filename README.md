@@ -46,6 +46,7 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Automatic Session Expiration**: Each session has a defined Time To Live (TTL). Expired sessions are automatically terminated to free resources.
 - **Dynamic Connection Handling**: When the session limit is reached, new connections can be rejected or queued — fully configurable.
 - **Real-time Session Monitoring**: Tracks and logs all active sessions in real time for auditing and analytics.
+- **Immediate blocking of new connections when sessions are saturated**: If an account exceeds the allowed session limit, any new users attempting to connect will be blocked from the very beginning and denied access.
 
 
 ## 📋 Requirements

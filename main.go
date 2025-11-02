@@ -396,8 +396,8 @@ func createSSHConfig() *ssh.ServerConfig {
 				// Create session
 				sessionID, err := sm.CreateSession(c.User(), ip, clientVersion)
 				if err != nil {
-					log.Printf("⚠️ Failed to create session for %s: %v", c.User(), err)
-					return nil, fmt.Errorf("session creation failed")
+					log.Printf("🚫 Failed to create session for %s from %s: %v", c.User(), ip, err)
+					return nil, err // Return the actual error message to user
 				}
 				
 				// Store sessionID in memory for later use in handleConnection
@@ -521,7 +521,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 6.2
+🛡️  Welcome to Abdal 4iProto Server ver 6.22
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 

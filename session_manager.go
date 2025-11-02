@@ -81,6 +81,16 @@ func GetSessionManager() *SessionManager {
 		}
 
 		dbPath := filepath.Join(sessionsDir, "sessions.db")
+		
+		// Delete existing database file on startup to clear old sessions
+		if _, err := os.Stat(dbPath); err == nil {
+			if err := os.Remove(dbPath); err != nil {
+				log.Printf("⚠️ Failed to remove old session database: %v", err)
+			} else {
+				log.Printf("🗑️ Removed old session database: %s", dbPath)
+			}
+		}
+		
 		db, err := bbolt.Open(dbPath, 0600, &bbolt.Options{Timeout: 1 * time.Second})
 		if err != nil {
 			log.Fatalf("❌ Failed to open session database: %v", err)
@@ -143,7 +153,7 @@ func getUserSessionTTL(username string) int {
 	return DEFAULT_SESSION_TTL_SECONDS
 }
 
-// CreateSession creates a new session and closes oldest session if limit exceeded
+// CreateSession creates a new session and rejects if max sessions limit exceeded
 func (sm *SessionManager) CreateSession(username, ip, clientVersion string) (string, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -160,22 +170,11 @@ func (sm *SessionManager) CreateSession(username, ip, clientVersion string) (str
 		return "", fmt.Errorf("failed to get active sessions: %w", err)
 	}
 
-	// If user has reached max sessions, revoke oldest session
+	// If user has reached max sessions, reject the new connection
+	// This protects existing users and prevents new connections when limit is exceeded
 	if len(activeSessions) >= maxSessions {
-		oldestSession := sm.findOldestSession(activeSessions)
-		if oldestSession != nil {
-			log.Printf("🔒 Max sessions reached for %s (%d/%d), revoking oldest session: %s", username, len(activeSessions), maxSessions, oldestSession.SessionID[:16]+"...")
-			sm.revokeSessionLocked(oldestSession.SessionID)
-			
-			// Close the connection if it exists
-			if conn, exists := sm.activeConnections[oldestSession.SessionID]; exists {
-				go func() {
-					conn.Close()
-					log.Printf("🔌 Closed connection for revoked session: %s", oldestSession.SessionID[:16]+"...")
-				}()
-				delete(sm.activeConnections, oldestSession.SessionID)
-			}
-		}
+		log.Printf("🚫 Max sessions reached for %s (%d/%d), rejecting new connection from %s", username, len(activeSessions), maxSessions, ip)
+		return "", fmt.Errorf("maximum concurrent sessions limit reached (%d/%d). please wait for an existing session to close", len(activeSessions), maxSessions)
 	}
 
 	// Create new session
