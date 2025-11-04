@@ -1,0 +1,57 @@
+[
+  {
+    "username": "ebrasha",
+    "password": "152314562152",
+    "role": "admin",
+    "blocked_domains": [],
+    "blocked_ips": [],
+    "log": "no",
+    "max_sessions": 1,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 10240,
+    "max_total_mb": 0
+  },
+  {
+    "username": "user1",
+    "password": "password123",
+    "role": "user",
+    "blocked_domains": [
+      "facebook.com",
+      "*.facebook.com",
+      "twitter.com",
+      "*.twitter.com",
+      "instagram.com",
+      "*.instagram.com"
+    ],
+    "blocked_ips": [
+      "192.168.1.100",
+      "10.0.0.*",
+      "172.16.*.*"
+    ],
+    "log": "yes",
+    "max_sessions": 2,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 10240
+  },
+  {
+    "username": "user2",
+    "password": "password456",
+    "role": "user",
+    "blocked_domains": [
+      "youtube.com",
+      "*.youtube.com",
+      "netflix.com",
+      "*.netflix.com"
+    ],
+    "blocked_ips": [
+      "192.168.10.1",
+      "10.10.10.10"
+    ],
+    "log": "yes",
+    "max_sessions": 5,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 5120
+  }
+]

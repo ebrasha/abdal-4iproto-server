@@ -1,0 +1,29 @@
+# -------------------------------------------------------------------
+# Programmer       : Ebrahim Shafiei (EbraSha)
+# Email            : Prof.Shafiei@Gmail.com
+# -------------------------------------------------------------------
+[Unit]
+Description=Abdal 4iProto Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/usr/local/abdal-4iproto-server
+EnvironmentFile=-/etc/default/abdal-4iproto-server
+ExecStart=/usr/local/abdal-4iproto-server/abdal_4iproto_server_linux_amd64
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/usr/local/abdal-4iproto-server
+SyslogIdentifier=abdal-4iproto-server
+
+[Install]
+WantedBy=multi-user.target
+
