@@ -53,8 +53,6 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Traffic Limit Enforcement**: Define total traffic usage caps (`max_total_mb`) in MB. If a user exceeds the quota, access is denied at login or forcefully disconnected during active sessions.  
   **📌 Example**: `10240` = 10 GB
 
-- **Persistent Traffic Usage**: User traffic data is stored in `users_traffic/traffic_<username>.json` and loaded on server startup for cumulative tracking.
-
 - **Real-time Bandwidth Enforcement**: Traffic usage is checked every 1–2 seconds. If usage exceeds the defined limit, the session is immediately terminated.
 
 
