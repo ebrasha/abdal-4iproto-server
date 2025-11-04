@@ -18,10 +18,12 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 	"io"
 	"log"
 	"net"
@@ -38,6 +40,9 @@ var activeConnections sync.Map // key: connection ID, value: connection info
 
 // Session metadata storage: sessionID -> connection metadata for session management
 var sessionMetadata sync.Map // key: sessionID, value: sessionInfo (username, ip, etc.)
+
+// Rate limiters per user: username -> *rate.Limiter
+var rateLimiters sync.Map // key: username, value: *rate.Limiter
 
 // SetExecutableDir changes current working directory to exe dir and returns it.
 func SetExecutableDir() (string, error) {
@@ -105,6 +110,8 @@ type User struct {
 	Log               string   `json:"log"`                    // "yes" or "no" - enable/disable user access logging
 	MaxSessions       int      `json:"max_sessions"`           // Maximum number of concurrent sessions (default: 2)
 	SessionTTLSeconds int      `json:"session_ttl_seconds"`     // Session TTL in seconds (default: 300)
+	MaxSpeedKBPS      int      `json:"max_speed_kbps"`          // Maximum speed in KB/s (0 = unlimited, default: 0)
+	MaxTotalMB        int      `json:"max_total_mb"`            // Maximum total traffic in MB (0 = unlimited, default: 0)
 }
 
 var users map[string]User
@@ -151,7 +158,15 @@ func loadUsers(path string) {
 			if user.SessionTTLSeconds <= 0 {
 				user.SessionTTLSeconds = 300 // Default TTL: 5 minutes (300 seconds)
 			}
+			if user.MaxTotalMB < 0 {
+				user.MaxTotalMB = 0 // Default: unlimited (0 means no limit)
+			}
 			users[user.Username] = user
+			
+			// Initialize rate limiter for user if MaxSpeedKBPS is set
+			if user.MaxSpeedKBPS > 0 {
+				initRateLimiter(user.Username, user.MaxSpeedKBPS)
+			}
 		}
 		log.Printf("✅ Loaded %d users with role-based access control", len(users))
 		return
@@ -172,6 +187,7 @@ func loadUsers(path string) {
 			Role:              "user",     // Default role for backward compatibility
 			MaxSessions:       2,           // Default max sessions
 			SessionTTLSeconds: 300,         // Default TTL: 5 minutes
+			MaxTotalMB:        0,           // Default: unlimited
 		}
 	}
 	log.Printf("✅ Loaded %d users from legacy format (all set to 'user' role)", len(users))
@@ -295,6 +311,255 @@ func matchesWildcard(str, pattern string) bool {
 	return false
 }
 
+// initRateLimiter initializes a rate limiter for a user
+func initRateLimiter(username string, maxSpeedKBPS int) {
+	if maxSpeedKBPS <= 0 {
+		return // No rate limiting
+	}
+	
+	// Convert KB/s to bytes per second
+	bytesPerSecond := rate.Limit(maxSpeedKBPS * 1024)
+	
+	// Create rate limiter with burst of 1KB (to allow small packets)
+	burst := maxSpeedKBPS * 1024 // 1 second worth of bytes
+	if burst > 1024*1024 {
+		burst = 1024 * 1024 // Max 1MB burst
+	}
+	
+	limiter := rate.NewLimiter(bytesPerSecond, burst)
+	rateLimiters.Store(username, limiter)
+	
+	log.Printf("⚡ Rate limiter initialized for %s: %d KB/s (burst: %d bytes)", username, maxSpeedKBPS, burst)
+}
+
+// getUserRateLimiter returns the rate limiter for a user (nil if unlimited)
+func getUserRateLimiter(username string) *rate.Limiter {
+	if limiter, ok := rateLimiters.Load(username); ok {
+		return limiter.(*rate.Limiter)
+	}
+	return nil // No rate limiting
+}
+
+// throttledReader wraps an io.Reader with rate limiting
+type throttledReader struct {
+	r        io.Reader
+	limiter  *rate.Limiter
+	username string
+}
+
+func (tr *throttledReader) Read(p []byte) (n int, err error) {
+	if tr.limiter == nil {
+		return tr.r.Read(p)
+	}
+	
+	// Read data
+	n, err = tr.r.Read(p)
+	if n <= 0 {
+		return n, err
+	}
+	
+	// Wait for rate limiter to allow this amount of data
+	err = tr.limiter.WaitN(context.Background(), n)
+	if err != nil {
+		return n, err
+	}
+	
+	return n, err
+}
+
+// throttledWriter wraps an io.Writer with rate limiting
+type throttledWriter struct {
+	w        io.Writer
+	limiter  *rate.Limiter
+	username string
+}
+
+func (tw *throttledWriter) Write(p []byte) (n int, err error) {
+	if tw.limiter == nil {
+		return tw.w.Write(p)
+	}
+	
+	// Wait for rate limiter to allow this amount of data
+	err = tw.limiter.WaitN(context.Background(), len(p))
+	if err != nil {
+		return 0, err
+	}
+	
+	// Write data
+	return tw.w.Write(p)
+}
+
+// checkUserTrafficLimit checks if user has exceeded their maximum traffic limit
+// Reads from memory (trafficMap) first, then from file if not in memory
+// Returns error if limit exceeded, nil otherwise
+func checkUserTrafficLimit(username string, maxTotalMB int) error {
+	// If no limit is set (0 or negative), allow access
+	if maxTotalMB <= 0 {
+		return nil
+	}
+
+	var stats *TrafficStats
+	var ok bool
+	var statsAny interface{}
+
+	// First, try to get traffic stats from memory (real-time)
+	statsAny, ok = trafficMap.Load(username)
+	if ok {
+		stats = statsAny.(*TrafficStats)
+	} else {
+		// If not in memory, try to load from file (for persistence across restarts)
+		exeDir, err := SetExecutableDir()
+		if err == nil {
+			trafficDir := filepath.Join(exeDir, "users_traffic")
+			filename := fmt.Sprintf("traffic_%s.json", username)
+			fullPath := filepath.Join(trafficDir, filename)
+			
+			// Check if traffic file exists
+			if _, err := os.Stat(fullPath); err == nil {
+				// File exists, read it
+				data, err := os.ReadFile(fullPath)
+				if err == nil {
+					var fileStats TrafficStats
+					if json.Unmarshal(data, &fileStats) == nil {
+						stats = &fileStats
+						// Store in memory for future use
+						trafficMap.Store(username, stats)
+					}
+				}
+			}
+		}
+		
+		// If still not found, user hasn't used any traffic yet, allow access
+		if stats == nil {
+			return nil
+		}
+	}
+
+	// Convert maxTotalMB to bytes (MB to bytes: MB * 1024 * 1024)
+	maxTotalBytes := int64(maxTotalMB) * 1024 * 1024
+
+	// Check if total_bytes exceeds limit
+	if stats.TotalBytes >= maxTotalBytes {
+		log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)", 
+			username, stats.TotalBytes, maxTotalMB, maxTotalBytes)
+		return fmt.Errorf("traffic limit exceeded: you have used %d MB (limit: %d MB). please contact administrator", 
+			stats.TotalBytes/(1024*1024), maxTotalMB)
+	}
+
+	return nil
+}
+
+// TrafficStatsMutex is a mutex-protected wrapper for TrafficStats
+type TrafficStatsMutex struct {
+	Stats *TrafficStats
+	mu    sync.RWMutex
+}
+
+var trafficStatsMutexMap sync.Map // key: username, value: *TrafficStatsMutex
+
+// updateTrafficStatsRealTime updates traffic stats in memory and checks limit in real-time
+// Returns true if limit exceeded (connection should be closed), false otherwise
+func updateTrafficStatsRealTime(username string, userIP string, sent int64, received int64, maxTotalMB int) bool {
+	// Get or create traffic stats mutex
+	statsMutexAny, ok := trafficStatsMutexMap.Load(username)
+	if !ok {
+		// Try to load from existing traffic file
+		var existingStats *TrafficStats
+		exeDir, err := SetExecutableDir()
+		if err == nil {
+			trafficDir := filepath.Join(exeDir, "users_traffic")
+			filename := fmt.Sprintf("traffic_%s.json", username)
+			fullPath := filepath.Join(trafficDir, filename)
+			if data, err := os.ReadFile(fullPath); err == nil {
+				var stats TrafficStats
+				if json.Unmarshal(data, &stats) == nil {
+					existingStats = &stats
+				}
+			}
+		}
+		
+		// If still not found, create new user stats
+		if existingStats == nil {
+			existingStats = &TrafficStats{
+				Username: username,
+				IP:       userIP,
+			}
+		}
+		
+		// Store in both maps
+		statsMutexAny = &TrafficStatsMutex{Stats: existingStats}
+		trafficStatsMutexMap.Store(username, statsMutexAny)
+		trafficMap.Store(username, existingStats)
+	}
+	
+	statsMutex := statsMutexAny.(*TrafficStatsMutex)
+	
+	// Lock for writing
+	statsMutex.mu.Lock()
+	defer statsMutex.mu.Unlock()
+	
+	stats := statsMutex.Stats
+	
+	// Update total values (cumulative across all sessions)
+	stats.TotalBytesSent += sent
+	stats.TotalBytesReceived += received
+	stats.TotalBytes = stats.TotalBytesSent + stats.TotalBytesReceived
+	stats.LastTimestamp = time.Now().Format(time.RFC3339)
+	
+	// Also update trafficMap for consistency
+	trafficMap.Store(username, stats)
+	
+	// Check limit in real-time
+	if maxTotalMB > 0 {
+		maxTotalBytes := int64(maxTotalMB) * 1024 * 1024
+		if stats.TotalBytes >= maxTotalBytes {
+			log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)", 
+				username, stats.TotalBytes, maxTotalMB, maxTotalBytes)
+			return true // Limit exceeded, connection should be closed
+		}
+	}
+	
+	return false // Within limit
+}
+
+// saveTrafficStatsToFile saves traffic stats to file (can be called periodically)
+func saveTrafficStatsToFile(username string) {
+	statsAny, ok := trafficMap.Load(username)
+	if !ok {
+		return // No stats to save
+	}
+	
+	stats := statsAny.(*TrafficStats)
+	
+	// Get executable directory
+	exeDir, err := SetExecutableDir()
+	if err != nil {
+		log.Printf("⚠️ Failed to get executable directory for saving traffic: %v", err)
+		return
+	}
+	
+	// Create users_traffic directory if it doesn't exist
+	trafficDir := filepath.Join(exeDir, "users_traffic")
+	if err := os.MkdirAll(trafficDir, 0755); err != nil {
+		log.Printf("⚠️ Failed to create users_traffic directory: %v", err)
+		return
+	}
+	
+	// Save to file
+	filename := fmt.Sprintf("traffic_%s.json", username)
+	fullPath := filepath.Join(trafficDir, filename)
+	data, err := json.MarshalIndent(stats, "", "  ")
+	if err != nil {
+		log.Printf("⚠️ Failed to marshal traffic stats for %s: %v", username, err)
+		return
+	}
+	
+	if err := os.WriteFile(fullPath, data, 0644); err != nil {
+		log.Printf("⚠️ Failed to write traffic file for %s: %v", username, err)
+		return
+	}
+}
+
 // Load existing traffic files on startup
 func loadExistingTrafficFiles() {
 	// Get executable directory and use it for file paths
@@ -385,6 +650,12 @@ func createSSHConfig() *ssh.ServerConfig {
 
 			if user, ok := users[c.User()]; ok && user.Password == string(pass) {
 				delete(failedAttempts, ip) // reset count
+				
+				// Check traffic limit before allowing authentication
+				if err := checkUserTrafficLimit(c.User(), user.MaxTotalMB); err != nil {
+					log.Printf("🚫 User %s from %s rejected: traffic limit exceeded", c.User(), ip)
+					return nil, err // Return the error message to user
+				}
 				
 				// Get session manager
 				sm := GetSessionManager()
@@ -521,7 +792,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 6.22
+🛡️  Welcome to Abdal 4iProto Server ver 7.5
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -646,7 +917,7 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 
 		// AllowUdpForwarding
 		if newChannel.ChannelType() == "direct-udpip" {
-			go handleDirectUDPIP(newChannel)
+			go handleDirectUDPIP(newChannel, username, userIP)
 			continue
 		}
 
@@ -741,12 +1012,81 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	var bytesReceived atomic.Int64
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3) // Added one more goroutine for real-time traffic updates
+
+	// Get user config for MaxTotalMB
+	user, _ := users[username]
+	maxTotalMB := user.MaxTotalMB
+
+	// Get rate limiter for this user
+	userLimiter := getUserRateLimiter(username)
+	
+	// Create throttled reader/writer if rate limiting is enabled
+	var downloadReader io.Reader = destConn
+	var downloadWriter io.Writer = channel
+	var uploadReader io.Reader = channel
+	var uploadWriter io.Writer = destConn
+	
+	if userLimiter != nil {
+		// For download: throttle writing to channel (data from server to client)
+		downloadWriter = &throttledWriter{w: channel, limiter: userLimiter, username: username}
+		
+		// For upload: throttle writing to destConn (data from client to server)
+		uploadWriter = &throttledWriter{w: destConn, limiter: userLimiter, username: username}
+	}
 
 	// Optimized buffer sizes for better performance
 	const bufferSize = 64 * 1024 // 64KB buffer for better throughput
 
-	// Receive from server → send to client (optimized)
+	// Channel to signal when connection should be closed (limit exceeded)
+	limitExceeded := make(chan bool, 1)
+	var lastSent int64 = 0
+	var lastReceived int64 = 0
+
+	// Real-time traffic update goroutine (updates every 1 second)
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-ticker.C:
+				// Get current traffic values
+				currentSent := bytesSent.Load()
+				currentReceived := bytesReceived.Load()
+				
+				// Calculate delta since last update
+				sentDelta := currentSent - lastSent
+				receivedDelta := currentReceived - lastReceived
+				
+				if sentDelta > 0 || receivedDelta > 0 {
+					// Update traffic stats in real-time
+					limitExceededFlag := updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
+					
+					if limitExceededFlag {
+						// Limit exceeded, signal to close connection
+						limitExceeded <- true
+						log.Printf("🚫 User %s exceeded traffic limit, closing connection", username)
+						channel.Close()
+						destConn.Close()
+						return
+					}
+					
+					// Save to file every 2 seconds
+					saveTrafficStatsToFile(username)
+					
+					// Update last values
+					lastSent = currentSent
+					lastReceived = currentReceived
+				}
+			case <-limitExceeded:
+				return
+			}
+		}
+	}()
+
+	// Receive from server → send to client (optimized with throttling)
 	go func() {
 		defer wg.Done()
 		defer channel.CloseWrite()
@@ -755,13 +1095,21 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		totalBytes := int64(0)
 		
 		for {
-			n, err := destConn.Read(buf)
+			// Check if limit exceeded
+			select {
+			case <-limitExceeded:
+				return
+			default:
+			}
+			
+			// Read with throttling
+			n, err := downloadReader.Read(buf)
 			if n > 0 {
 				bytesReceived.Add(int64(n))
 				totalBytes += int64(n)
 				
-				// Write to channel with error handling
-				if _, writeErr := channel.Write(buf[:n]); writeErr != nil {
+				// Write with throttling
+				if _, writeErr := downloadWriter.Write(buf[:n]); writeErr != nil {
 					break
 				}
 			}
@@ -773,7 +1121,7 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		log.Printf("📥 %s received %d bytes from %s", username, totalBytes, target)
 	}()
 
-	// Send from client → to server (optimized)
+	// Send from client → to server (optimized with throttling)
 	go func() {
 		defer wg.Done()
 		defer destConn.Close()
@@ -782,13 +1130,21 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		totalBytes := int64(0)
 		
 		for {
-			n, err := channel.Read(buf)
+			// Check if limit exceeded
+			select {
+			case <-limitExceeded:
+				return
+			default:
+			}
+			
+			// Read with throttling
+			n, err := uploadReader.Read(buf)
 			if n > 0 {
 				bytesSent.Add(int64(n))
 				totalBytes += int64(n)
 				
-				// Write to destination with error handling
-				if _, writeErr := destConn.Write(buf[:n]); writeErr != nil {
+				// Write with throttling
+				if _, writeErr := uploadWriter.Write(buf[:n]); writeErr != nil {
 					break
 				}
 			}
@@ -802,63 +1158,48 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 
 	wg.Wait()
 
-	// 🧠 After completing send and receive, update values:
+	// Final update after connection closes
 	sent := bytesSent.Load()
 	received := bytesReceived.Load()
-
-	statsAny, ok := trafficMap.Load(username)
-	if !ok {
-		// Try to load from existing traffic file
-		exeDir, err := SetExecutableDir()
-		if err == nil {
-			trafficDir := filepath.Join(exeDir, "users_traffic")
-			filename := fmt.Sprintf("traffic_%s.json", username)
-			fullPath := filepath.Join(trafficDir, filename)
-			if data, err := os.ReadFile(fullPath); err == nil {
-				var existingStats TrafficStats
-				if json.Unmarshal(data, &existingStats) == nil {
-					statsAny = &existingStats
-					trafficMap.Store(username, statsAny)
-					log.Printf("✅ Loaded existing traffic data for %s", username)
-				}
-			}
-		}
-		
-		// If still not found, create new user stats
-		if statsAny == nil {
-			statsAny = &TrafficStats{
-				Username: username,
-				IP:       userIP,
-			}
-			trafficMap.Store(username, statsAny)
-		}
+	
+	// Update final traffic stats (in case there's any remaining delta)
+	if sent > lastSent || received > lastReceived {
+		sentDelta := sent - lastSent
+		receivedDelta := received - lastReceived
+		updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
+		saveTrafficStatsToFile(username)
 	}
-	stats := statsAny.(*TrafficStats)
 
-	// Update session values
-	stats.LastBytesSent = sent
-	stats.LastBytesReceived = received
-	stats.LastBytesTotal = sent + received
-	stats.LastTimestamp = time.Now().Format(time.RFC3339)
-
-	// Add to total values (cumulative across all sessions)
-	stats.TotalBytesSent += sent
-	stats.TotalBytesReceived += received
-	stats.TotalBytes = stats.TotalBytesSent + stats.TotalBytesReceived
-
-	log.Printf("🧠 [MEMORY] Updated traffic for %s in RAM - Session: ↑%dB ↓%dB | Total: ↑%dB ↓%dB 📦%dB", 
-		username, sent, received, stats.TotalBytesSent, stats.TotalBytesReceived, stats.TotalBytes)
-
+	// Update session values (for last session stats)
+	statsAny, ok := trafficMap.Load(username)
+	if ok {
+		stats := statsAny.(*TrafficStats)
+		stats.LastBytesSent = sent
+		stats.LastBytesReceived = received
+		stats.LastBytesTotal = sent + received
+		stats.LastTimestamp = time.Now().Format(time.RFC3339)
+		saveTrafficStatsToFile(username)
+		
+		log.Printf("🧠 [MEMORY] Final traffic update for %s - Session: ↑%dB ↓%dB | Total: ↑%dB ↓%dB 📦%dB", 
+			username, sent, received, stats.TotalBytesSent, stats.TotalBytesReceived, stats.TotalBytes)
+	}
 }
 
 // Handle UDP forwarding through SSH with length-prefix framing
-func handleDirectUDPIP(newChannel ssh.NewChannel) {
+func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string) {
 	type directUDPIPReq struct {
 		HostToConnect     string
 		PortToConnect     uint32
 		OriginatorAddress string
 		OriginatorPort    uint32
 	}
+
+	// Get user config for MaxTotalMB
+	user, _ := users[username]
+	maxTotalMB := user.MaxTotalMB
+
+	// Get rate limiter for this user
+	userLimiter := getUserRateLimiter(username)
 
 	// Helper functions for length-prefix framing
 	readFrame := func(r io.Reader) ([]byte, error) {
@@ -881,10 +1222,16 @@ func handleDirectUDPIP(newChannel ssh.NewChannel) {
 		}
 		var lb [2]byte
 		binary.BigEndian.PutUint16(lb[:], uint16(len(payload)))
-		if _, err := w.Write(lb[:]); err != nil {
+		
+		var writer io.Writer = w
+		if userLimiter != nil {
+			writer = &throttledWriter{w: w, limiter: userLimiter, username: username}
+		}
+		
+		if _, err := writer.Write(lb[:]); err != nil {
 			return err
 		}
-		_, err := w.Write(payload)
+		_, err := writer.Write(payload)
 		return err
 	}
 
@@ -918,37 +1265,145 @@ func handleDirectUDPIP(newChannel ssh.NewChannel) {
 	// Set initial deadline for connection management
 	_ = udpConn.SetDeadline(time.Now().Add(60 * time.Second))
 
-	// SSH → UDP (with framing)
+	var bytesSent atomic.Int64
+	var bytesReceived atomic.Int64
+	var lastSent int64 = 0
+	var lastReceived int64 = 0
+	
+	// Channel to signal when connection should be closed (limit exceeded)
+	limitExceeded := make(chan bool, 1)
+	
+	// Real-time traffic update goroutine (updates every 1 second)
 	go func() {
-		defer udpConn.Close()
-		defer channel.CloseWrite()
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		
 		for {
-			payload, err := readFrame(channel)
-			if err != nil {
-				return
-			}
-			udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			if _, err := udpConn.Write(payload); err != nil {
+			select {
+			case <-ticker.C:
+				// Get current traffic values
+				currentSent := bytesSent.Load()
+				currentReceived := bytesReceived.Load()
+				
+				// Calculate delta since last update
+				sentDelta := currentSent - lastSent
+				receivedDelta := currentReceived - lastReceived
+				
+				if sentDelta > 0 || receivedDelta > 0 {
+					// Update traffic stats in real-time
+					limitExceededFlag := updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
+					
+					if limitExceededFlag {
+						// Limit exceeded, signal to close connection
+						limitExceeded <- true
+						log.Printf("🚫 User %s exceeded traffic limit, closing UDP connection", username)
+						channel.Close()
+						udpConn.Close()
+						return
+					}
+					
+					// Save to file every 2 seconds
+					saveTrafficStatsToFile(username)
+					
+					// Update last values
+					lastSent = currentSent
+					lastReceived = currentReceived
+				}
+			case <-limitExceeded:
 				return
 			}
 		}
 	}()
 
-	// UDP → SSH (with framing)
+	// SSH → UDP (with framing and throttling)
+	go func() {
+		defer udpConn.Close()
+		defer channel.CloseWrite()
+		
+		var udpWriter io.Writer = udpConn
+		if userLimiter != nil {
+			udpWriter = &throttledWriter{w: udpConn, limiter: userLimiter, username: username}
+		}
+		
+		for {
+			// Check if limit exceeded
+			select {
+			case <-limitExceeded:
+				return
+			default:
+			}
+			
+			payload, err := readFrame(channel)
+			if err != nil {
+				return
+			}
+			udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			if _, err := udpWriter.Write(payload); err != nil {
+				return
+			} else {
+				bytesSent.Add(int64(len(payload) + 2)) // +2 for length prefix
+			}
+		}
+	}()
+
+	// UDP → SSH (with framing and throttling)
 	go func() {
 		defer channel.Close()
+		
+		var channelWriter io.Writer = channel
+		if userLimiter != nil {
+			channelWriter = &throttledWriter{w: channel, limiter: userLimiter, username: username}
+		}
+		
 		buf := make([]byte, 65535) // Maximum UDP packet size
 		for {
+			// Check if limit exceeded
+			select {
+			case <-limitExceeded:
+				return
+			default:
+			}
+			
 			udpConn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			n, _, err := udpConn.ReadFromUDP(buf)
 			if err != nil {
 				return
 			}
-			if err := writeFrame(channel, buf[:n]); err != nil {
+			
+			// Write with throttling (throttling is applied in writeFrame)
+			if err := writeFrame(channelWriter, buf[:n]); err != nil {
 				return
+			} else {
+				bytesReceived.Add(int64(n + 2)) // +2 for length prefix
 			}
 		}
 	}()
+	
+	// Wait for both goroutines to finish
+	// Final update after connection closes
+	time.Sleep(100 * time.Millisecond) // Give goroutines time to finish
+	
+	sent := bytesSent.Load()
+	received := bytesReceived.Load()
+	
+	// Update final traffic stats (in case there's any remaining delta)
+	if sent > lastSent || received > lastReceived {
+		sentDelta := sent - lastSent
+		receivedDelta := received - lastReceived
+		updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
+		saveTrafficStatsToFile(username)
+	}
+	
+	// Update session values (for last session stats)
+	statsAny, ok := trafficMap.Load(username)
+	if ok {
+		stats := statsAny.(*TrafficStats)
+		stats.LastBytesSent = sent
+		stats.LastBytesReceived = received
+		stats.LastBytesTotal = sent + received
+		stats.LastTimestamp = time.Now().Format(time.RFC3339)
+		saveTrafficStatsToFile(username)
+	}
 }
 
 // logInvalidLogin writes failed login attempts to a log file

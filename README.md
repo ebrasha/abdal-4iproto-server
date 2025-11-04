@@ -47,6 +47,15 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **Dynamic Connection Handling**: When the session limit is reached, new connections can be rejected or queued — fully configurable.
 - **Real-time Session Monitoring**: Tracks and logs all active sessions in real time for auditing and analytics.
 - **Immediate blocking of new connections when sessions are saturated**: If an account exceeds the allowed session limit, any new users attempting to connect will be blocked from the very beginning and denied access.
+- **Rate Limiting**: Define per-user data transfer speed limits (`max_speed_kbps`) in KB/s. Applied in real time using the Token Bucket algorithm for both upload and download.  
+  **📌 Example**: `1024` = 1 MB/s
+
+- **Traffic Limit Enforcement**: Define total traffic usage caps (`max_total_mb`) in MB. If a user exceeds the quota, access is denied at login or forcefully disconnected during active sessions.  
+  **📌 Example**: `10240` = 10 GB
+
+- **Persistent Traffic Usage**: User traffic data is stored in `users_traffic/traffic_<username>.json` and loaded on server startup for cumulative tracking.
+
+- **Real-time Bandwidth Enforcement**: Traffic usage is checked every 1–2 seconds. If usage exceeds the defined limit, the session is immediately terminated.
 
 
 ## 📋 Requirements

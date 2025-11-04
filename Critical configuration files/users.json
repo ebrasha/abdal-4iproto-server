@@ -7,7 +7,9 @@
     "blocked_ips": [],
     "log": "no",
     "max_sessions": 1,
-    "session_ttl_seconds": 300
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 10240,
+    "max_total_mb": 0
   },
   {
     "username": "user1",
@@ -28,7 +30,9 @@
     ],
     "log": "yes",
     "max_sessions": 2,
-    "session_ttl_seconds": 300
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 10240
   },
   {
     "username": "user2",
@@ -46,6 +50,8 @@
     ],
     "log": "yes",
     "max_sessions": 5,
-    "session_ttl_seconds": 300
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 5120
   }
 ]
