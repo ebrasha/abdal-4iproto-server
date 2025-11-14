@@ -1,7 +1,7 @@
 # Abdal 4iProto Server
 
 <div align="center">
-  <img src="src.png" alt="Abdal 4iProto Server" width="600">
+  <img src="src-en.jpg" alt="Abdal 4iProto Server"  >
 </div>
 
 A high-performance SSH-based tunneling server designed for secure internet access, built with advanced security features and traffic monitoring capabilities.
@@ -278,7 +278,7 @@ Traffic data is automatically saved to `traffic_username.json` files:
 - Provides comprehensive security analytics
 
 ## 🐛 Reporting Issues
-If you encounter any issues or have configuration problems, please reach out via email at Prof.Shafiei@Gmail.com. You can also report issues on GitLab or GitHub.
+If you encounter any issues or have configuration problems, please reach out via email at Prof.Shafiei@Gmail.com. You can also report issues on GitHub.
 
 ## ❤️ Donation
 If you find this project helpful and would like to support further development, please consider making a donation:

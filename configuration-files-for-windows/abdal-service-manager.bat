@@ -21,7 +21,7 @@ REM **********************************************************************
 color 0F
 
 :: Service configuration
-set "SERVICE_NAME=Abdal 4iProto Server"
+set "SERVICE_NAME=Abdal4iProtoServer"
 set "SERVICE_DISPLAY_NAME=Abdal 4iProto Server"
 set "SERVICE_DESCRIPTION=Abdal 4iProto Server - Advanced Network Protocol Service"
 set "EXECUTABLE_NAME=abdal-4iproto-server-windows-amd64.exe"

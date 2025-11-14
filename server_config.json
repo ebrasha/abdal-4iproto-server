@@ -1,0 +1,8 @@
+{
+  "ports": [2222, 3333],
+  "shell": "/bin/bash",
+  "max_auth_attempts": 3,
+  "server_version": "SSH-2.0-Abdal-4iProto-Server",
+  "private_key_file": "id_rsa",
+  "public_key_file": "id_rsa.pub"
+}

@@ -121,6 +121,8 @@ type ServerConfig struct {
 	Shell           string `json:"shell"`
 	MaxAuthAttempts int    `json:"max_auth_attempts"`
 	ServerVersion   string `json:"server_version"`
+	PrivateKeyFile  string `json:"private_key_file"`  // Path to private key file (default: "id_rsa")
+	PublicKeyFile   string `json:"public_key_file"`   // Path to public key file (default: "id_rsa.pub")
 }
 
 var serverConfig ServerConfig
@@ -700,9 +702,45 @@ func createSSHConfig() *ssh.ServerConfig {
 		},
 	}
 
-	privateBytes, err := os.ReadFile("id_rsa")
+	// Configure SSH algorithms for better performance
+	config.Config = ssh.Config{
+		Ciphers: []string{
+			"chacha20-poly1305@openssh.com",     // Fast & secure
+			"aes128-gcm@openssh.com",            // Lightweight
+			"aes256-ctr",                        // Compatibility for older clients
+			"aes192-ctr",
+			"aes128-ctr",
+		},
+		KeyExchanges: []string{
+			"curve25519-sha256",                // Extremely Fast
+			"diffie-hellman-group14-sha1",      // Compatible fallback
+		},
+		MACs: []string{
+			"hmac-sha2-256-etm@openssh.com",    // Secure
+			"hmac-sha2-256",                    // Compatibility
+			"hmac-sha1",                        // Fallback for old clients
+		},
+	}
+	
+
+	// Get private key file path from config (default to "id_rsa" if not specified)
+	privateKeyFile := serverConfig.PrivateKeyFile
+	if privateKeyFile == "" {
+		privateKeyFile = "id_rsa"
+	}
+
+	// Get executable directory for relative paths
+	exeDir, err := SetExecutableDir()
 	if err != nil {
-		log.Fatalf("Failed to load private key: %s", err)
+		log.Fatalf("Failed to get executable directory: %v", err)
+	}
+
+	// Resolve full path to private key file
+	privateKeyPath := filepath.Join(exeDir, privateKeyFile)
+
+	privateBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load private key from %s: %s", privateKeyPath, err)
 	}
 
 	private, err := ssh.ParsePrivateKey(privateBytes)
@@ -792,7 +830,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 7.5
+🛡️  Welcome to Abdal 4iProto Server ver 8.2
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
