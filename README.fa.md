@@ -249,9 +249,12 @@ sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
 
 [دانلود کلاینت رسمی Abdal 4iProto برای ویندوز](https://github.com/ebrasha/abdal-4iproto-client)
 
+
 ### 🤖 کلاینت اندروید
 
 [دانلود NapsternetV از گوگل‌پلی](https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv&hl=fa)
+
+[دانلود OpenTunnel از گوگل‌پلی](https://play.google.com/store/apps/details?id=com.opentunnel.app&hl=en&pli=1)
 
 ### 🍏 کلاینت آیفون (iOS)
 
