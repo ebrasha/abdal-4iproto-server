@@ -123,6 +123,11 @@ type ServerConfig struct {
 	ServerVersion   string `json:"server_version"`
 	PrivateKeyFile  string `json:"private_key_file"`  // Path to private key file (default: "id_rsa")
 	PublicKeyFile   string `json:"public_key_file"`   // Path to public key file (default: "id_rsa.pub")
+	DNSTTEnabled    bool   `json:"dnstt_enabled"`     // Enable DNSTT gateway
+	DNSTTListen     string `json:"dnstt_listen"`       // DNSTT listen address (e.g., ":53")
+	DNSTTResolver   string `json:"dnstt_resolver"`    // DNSTT resolver address (e.g., "8.8.8.8")
+	DNSTTNameserver string `json:"dnstt_nameserver"`  // DNSTT nameserver domain (e.g., "dns.example.com")
+	DNSTTPublicKey  string `json:"dnstt_public_key"`   // DNSTT public key for session establishment
 }
 
 var serverConfig ServerConfig
@@ -830,7 +835,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 8.2
+🛡️  Welcome to Abdal 4iProto Server ver 8.3
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -1300,9 +1305,6 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	}
 	go ssh.DiscardRequests(requests)
 
-	// Set initial deadline for connection management
-	_ = udpConn.SetDeadline(time.Now().Add(60 * time.Second))
-
 	var bytesSent atomic.Int64
 	var bytesReceived atomic.Int64
 	var lastSent int64 = 0
@@ -1375,7 +1377,6 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 			if err != nil {
 				return
 			}
-			udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			if _, err := udpWriter.Write(payload); err != nil {
 				return
 			} else {
@@ -1402,7 +1403,6 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 			default:
 			}
 			
-			udpConn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			n, _, err := udpConn.ReadFromUDP(buf)
 			if err != nil {
 				return
@@ -1573,6 +1573,11 @@ func startServer() {
 	// Initialize session manager and start cleanup routine
 	sm := GetSessionManager()
 	sm.StartCleanupRoutine()
+
+	// Start DNSTT Gateway if enabled
+	if serverConfig.DNSTTEnabled {
+		go startDNSTTGateway(serverConfig)
+	}
 
 	for _, port := range serverConfig.Ports {
 		go func(p int) {
