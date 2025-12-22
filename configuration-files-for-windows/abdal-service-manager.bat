@@ -24,7 +24,7 @@ color 0F
 set "SERVICE_NAME=Abdal4iProtoServer"
 set "SERVICE_DISPLAY_NAME=Abdal 4iProto Server"
 set "SERVICE_DESCRIPTION=Abdal 4iProto Server - Advanced Network Protocol Service"
-set "EXECUTABLE_NAME=abdal-4iproto-server-windows-amd64.exe"
+set "EXECUTABLE_NAME=abdal-4iproto-server-windows.exe"
 set "CURRENT_DIR=%~dp0"
 
 :: Check for admin privileges
