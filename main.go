@@ -22,8 +22,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/time/rate"
 	"io"
 	"log"
 	"net"
@@ -33,9 +31,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 )
 
-var trafficMap sync.Map // key: username, value: *TrafficStats
+var trafficMap sync.Map        // key: username, value: *TrafficStats
 var activeConnections sync.Map // key: connection ID, value: connection info
 
 // Session metadata storage: sessionID -> connection metadata for session management
@@ -104,14 +105,14 @@ type TrafficStats struct {
 type User struct {
 	Username          string   `json:"username"`
 	Password          string   `json:"password"`
-	Role              string   `json:"role"`                   // "user" or "admin"
-	BlockedDomains    []string `json:"blocked_domains"`        // List of blocked domains/IPs with wildcard support
-	BlockedIPs        []string `json:"blocked_ips"`             // List of blocked IPs with wildcard support
-	Log               string   `json:"log"`                    // "yes" or "no" - enable/disable user access logging
-	MaxSessions       int      `json:"max_sessions"`           // Maximum number of concurrent sessions (default: 2)
-	SessionTTLSeconds int      `json:"session_ttl_seconds"`     // Session TTL in seconds (default: 300)
-	MaxSpeedKBPS      int      `json:"max_speed_kbps"`          // Maximum speed in KB/s (0 = unlimited, default: 0)
-	MaxTotalMB        int      `json:"max_total_mb"`            // Maximum total traffic in MB (0 = unlimited, default: 0)
+	Role              string   `json:"role"`                // "user" or "admin"
+	BlockedDomains    []string `json:"blocked_domains"`     // List of blocked domains/IPs with wildcard support
+	BlockedIPs        []string `json:"blocked_ips"`         // List of blocked IPs with wildcard support
+	Log               string   `json:"log"`                 // "yes" or "no" - enable/disable user access logging
+	MaxSessions       int      `json:"max_sessions"`        // Maximum number of concurrent sessions (default: 2)
+	SessionTTLSeconds int      `json:"session_ttl_seconds"` // Session TTL in seconds (default: 300)
+	MaxSpeedKBPS      int      `json:"max_speed_kbps"`      // Maximum speed in KB/s (0 = unlimited, default: 0)
+	MaxTotalMB        int      `json:"max_total_mb"`        // Maximum total traffic in MB (0 = unlimited, default: 0)
 }
 
 var users map[string]User
@@ -121,13 +122,13 @@ type ServerConfig struct {
 	Shell           string `json:"shell"`
 	MaxAuthAttempts int    `json:"max_auth_attempts"`
 	ServerVersion   string `json:"server_version"`
-	PrivateKeyFile  string `json:"private_key_file"`  // Path to private key file (default: "id_rsa")
-	PublicKeyFile   string `json:"public_key_file"`   // Path to public key file (default: "id_rsa.pub")
-	DNSTTEnabled    bool   `json:"dnstt_enabled"`     // Enable DNSTT gateway
-	DNSTTListen     string `json:"dnstt_listen"`       // DNSTT listen address (e.g., ":53")
-	DNSTTResolver   string `json:"dnstt_resolver"`    // DNSTT resolver address (e.g., "8.8.8.8")
-	DNSTTNameserver string `json:"dnstt_nameserver"`  // DNSTT nameserver domain (e.g., "dns.example.com")
-	DNSTTPublicKey  string `json:"dnstt_public_key"`   // DNSTT public key for session establishment
+	PrivateKeyFile  string `json:"private_key_file"` // Path to private key file (default: "id_rsa")
+	PublicKeyFile   string `json:"public_key_file"`  // Path to public key file (default: "id_rsa.pub")
+	DNSTTEnabled    bool   `json:"dnstt_enabled"`    // Enable DNSTT gateway
+	DNSTTListen     string `json:"dnstt_listen"`     // DNSTT listen address (e.g., ":53")
+	DNSTTResolver   string `json:"dnstt_resolver"`   // DNSTT resolver address (e.g., "8.8.8.8")
+	DNSTTNameserver string `json:"dnstt_nameserver"` // DNSTT nameserver domain (e.g., "dns.example.com")
+	DNSTTPublicKey  string `json:"dnstt_public_key"` // DNSTT public key for session establishment
 }
 
 var serverConfig ServerConfig
@@ -145,13 +146,13 @@ func loadUsers(path string) {
 	if err != nil {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
-	
+
 	fullPath := filepath.Join(exeDir, path)
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		log.Fatalf("Failed to read users file: %v", err)
 	}
-	
+
 	// Try to parse as new format first (array of User objects)
 	var userList []User
 	if err := json.Unmarshal(data, &userList); err == nil {
@@ -169,7 +170,7 @@ func loadUsers(path string) {
 				user.MaxTotalMB = 0 // Default: unlimited (0 means no limit)
 			}
 			users[user.Username] = user
-			
+
 			// Initialize rate limiter for user if MaxSpeedKBPS is set
 			if user.MaxSpeedKBPS > 0 {
 				initRateLimiter(user.Username, user.MaxSpeedKBPS)
@@ -178,23 +179,23 @@ func loadUsers(path string) {
 		log.Printf("✅ Loaded %d users with role-based access control", len(users))
 		return
 	}
-	
+
 	// Fallback to old format (map[string]string) for backward compatibility
 	var oldUserPass map[string]string
 	if err := json.Unmarshal(data, &oldUserPass); err != nil {
 		log.Fatalf("Failed to parse users file: %v", err)
 	}
-	
+
 	// Convert old format to new format with default "user" role
 	users = make(map[string]User)
 	for username, password := range oldUserPass {
 		users[username] = User{
 			Username:          username,
 			Password:          password,
-			Role:              "user",     // Default role for backward compatibility
-			MaxSessions:       2,           // Default max sessions
-			SessionTTLSeconds: 300,         // Default TTL: 5 minutes
-			MaxTotalMB:        0,           // Default: unlimited
+			Role:              "user", // Default role for backward compatibility
+			MaxSessions:       2,      // Default max sessions
+			SessionTTLSeconds: 300,    // Default TTL: 5 minutes
+			MaxTotalMB:        0,      // Default: unlimited
 		}
 	}
 	log.Printf("✅ Loaded %d users from legacy format (all set to 'user' role)", len(users))
@@ -206,7 +207,7 @@ func loadServerConfig(path string) {
 	if err != nil {
 		log.Fatalf("Failed to get executable directory: %v", err)
 	}
-	
+
 	fullPath := filepath.Join(exeDir, path)
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
@@ -228,7 +229,7 @@ func loadBlockedIPs() {
 		blockedIPs = BlockedIPs{}
 		return
 	}
-	
+
 	fullPath := filepath.Join(exeDir, "blocked_ips.json")
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
@@ -245,7 +246,7 @@ func saveBlockedIPs() {
 		log.Printf("Failed to get executable directory: %v", err)
 		return
 	}
-	
+
 	data, _ := json.MarshalIndent(blockedIPs, "", "  ")
 	fullPath := filepath.Join(exeDir, "blocked_ips.json")
 	_ = os.WriteFile(fullPath, data, 0644)
@@ -298,7 +299,7 @@ func matchesWildcard(str, pattern string) bool {
 		// Convert wildcard pattern to regex
 		regexPattern := strings.ReplaceAll(pattern, ".", "\\.")
 		regexPattern = strings.ReplaceAll(regexPattern, "*", ".*")
-		
+
 		// Simple regex matching (you might want to use regexp package for more complex patterns)
 		if strings.HasPrefix(regexPattern, ".*") && strings.HasSuffix(regexPattern, ".*") {
 			// Pattern like *example.com*
@@ -323,19 +324,19 @@ func initRateLimiter(username string, maxSpeedKBPS int) {
 	if maxSpeedKBPS <= 0 {
 		return // No rate limiting
 	}
-	
+
 	// Convert KB/s to bytes per second
 	bytesPerSecond := rate.Limit(maxSpeedKBPS * 1024)
-	
+
 	// Create rate limiter with burst of 1KB (to allow small packets)
 	burst := maxSpeedKBPS * 1024 // 1 second worth of bytes
 	if burst > 1024*1024 {
 		burst = 1024 * 1024 // Max 1MB burst
 	}
-	
+
 	limiter := rate.NewLimiter(bytesPerSecond, burst)
 	rateLimiters.Store(username, limiter)
-	
+
 	log.Printf("⚡ Rate limiter initialized for %s: %d KB/s (burst: %d bytes)", username, maxSpeedKBPS, burst)
 }
 
@@ -358,19 +359,19 @@ func (tr *throttledReader) Read(p []byte) (n int, err error) {
 	if tr.limiter == nil {
 		return tr.r.Read(p)
 	}
-	
+
 	// Read data
 	n, err = tr.r.Read(p)
 	if n <= 0 {
 		return n, err
 	}
-	
+
 	// Wait for rate limiter to allow this amount of data
 	err = tr.limiter.WaitN(context.Background(), n)
 	if err != nil {
 		return n, err
 	}
-	
+
 	return n, err
 }
 
@@ -385,13 +386,13 @@ func (tw *throttledWriter) Write(p []byte) (n int, err error) {
 	if tw.limiter == nil {
 		return tw.w.Write(p)
 	}
-	
+
 	// Wait for rate limiter to allow this amount of data
 	err = tw.limiter.WaitN(context.Background(), len(p))
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// Write data
 	return tw.w.Write(p)
 }
@@ -420,7 +421,7 @@ func checkUserTrafficLimit(username string, maxTotalMB int) error {
 			trafficDir := filepath.Join(exeDir, "users_traffic")
 			filename := fmt.Sprintf("traffic_%s.json", username)
 			fullPath := filepath.Join(trafficDir, filename)
-			
+
 			// Check if traffic file exists
 			if _, err := os.Stat(fullPath); err == nil {
 				// File exists, read it
@@ -435,7 +436,7 @@ func checkUserTrafficLimit(username string, maxTotalMB int) error {
 				}
 			}
 		}
-		
+
 		// If still not found, user hasn't used any traffic yet, allow access
 		if stats == nil {
 			return nil
@@ -447,9 +448,9 @@ func checkUserTrafficLimit(username string, maxTotalMB int) error {
 
 	// Check if total_bytes exceeds limit
 	if stats.TotalBytes >= maxTotalBytes {
-		log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)", 
+		log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)",
 			username, stats.TotalBytes, maxTotalMB, maxTotalBytes)
-		return fmt.Errorf("traffic limit exceeded: you have used %d MB (limit: %d MB). please contact administrator", 
+		return fmt.Errorf("traffic limit exceeded: you have used %d MB (limit: %d MB). please contact administrator",
 			stats.TotalBytes/(1024*1024), maxTotalMB)
 	}
 
@@ -484,7 +485,7 @@ func updateTrafficStatsRealTime(username string, userIP string, sent int64, rece
 				}
 			}
 		}
-		
+
 		// If still not found, create new user stats
 		if existingStats == nil {
 			existingStats = &TrafficStats{
@@ -492,40 +493,40 @@ func updateTrafficStatsRealTime(username string, userIP string, sent int64, rece
 				IP:       userIP,
 			}
 		}
-		
+
 		// Store in both maps
 		statsMutexAny = &TrafficStatsMutex{Stats: existingStats}
 		trafficStatsMutexMap.Store(username, statsMutexAny)
 		trafficMap.Store(username, existingStats)
 	}
-	
+
 	statsMutex := statsMutexAny.(*TrafficStatsMutex)
-	
+
 	// Lock for writing
 	statsMutex.mu.Lock()
 	defer statsMutex.mu.Unlock()
-	
+
 	stats := statsMutex.Stats
-	
+
 	// Update total values (cumulative across all sessions)
 	stats.TotalBytesSent += sent
 	stats.TotalBytesReceived += received
 	stats.TotalBytes = stats.TotalBytesSent + stats.TotalBytesReceived
 	stats.LastTimestamp = time.Now().Format(time.RFC3339)
-	
+
 	// Also update trafficMap for consistency
 	trafficMap.Store(username, stats)
-	
+
 	// Check limit in real-time
 	if maxTotalMB > 0 {
 		maxTotalBytes := int64(maxTotalMB) * 1024 * 1024
 		if stats.TotalBytes >= maxTotalBytes {
-			log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)", 
+			log.Printf("🚫 User %s exceeded traffic limit: %d bytes (limit: %d MB = %d bytes)",
 				username, stats.TotalBytes, maxTotalMB, maxTotalBytes)
 			return true // Limit exceeded, connection should be closed
 		}
 	}
-	
+
 	return false // Within limit
 }
 
@@ -535,23 +536,23 @@ func saveTrafficStatsToFile(username string) {
 	if !ok {
 		return // No stats to save
 	}
-	
+
 	stats := statsAny.(*TrafficStats)
-	
+
 	// Get executable directory
 	exeDir, err := SetExecutableDir()
 	if err != nil {
 		log.Printf("⚠️ Failed to get executable directory for saving traffic: %v", err)
 		return
 	}
-	
+
 	// Create users_traffic directory if it doesn't exist
 	trafficDir := filepath.Join(exeDir, "users_traffic")
 	if err := os.MkdirAll(trafficDir, 0755); err != nil {
 		log.Printf("⚠️ Failed to create users_traffic directory: %v", err)
 		return
 	}
-	
+
 	// Save to file
 	filename := fmt.Sprintf("traffic_%s.json", username)
 	fullPath := filepath.Join(trafficDir, filename)
@@ -560,7 +561,7 @@ func saveTrafficStatsToFile(username string) {
 		log.Printf("⚠️ Failed to marshal traffic stats for %s: %v", username, err)
 		return
 	}
-	
+
 	if err := os.WriteFile(fullPath, data, 0644); err != nil {
 		log.Printf("⚠️ Failed to write traffic file for %s: %v", username, err)
 		return
@@ -575,7 +576,7 @@ func loadExistingTrafficFiles() {
 		log.Printf("❌ Failed to get executable directory: %v", err)
 		return
 	}
-	
+
 	// Create users_traffic directory if it doesn't exist
 	trafficDir := filepath.Join(exeDir, "users_traffic")
 	if err := os.MkdirAll(trafficDir, 0755); err != nil {
@@ -601,7 +602,7 @@ func loadExistingTrafficFiles() {
 		if len(filename) > 13 && filename[:8] == "traffic_" && filename[len(filename)-5:] == ".json" {
 			// Extract username from filename
 			username := filename[8 : len(filename)-5]
-			
+
 			// Read and parse the traffic file
 			fullPath := filepath.Join(trafficDir, filename)
 			data, err := os.ReadFile(fullPath)
@@ -619,8 +620,8 @@ func loadExistingTrafficFiles() {
 			// Store in memory
 			trafficMap.Store(username, &stats)
 			loadedCount++
-			
-			log.Printf("📊 Loaded traffic data for %s: ↑%dB ↓%dB 📦%dB", 
+
+			log.Printf("📊 Loaded traffic data for %s: ↑%dB ↓%dB 📦%dB",
 				username, stats.TotalBytesSent, stats.TotalBytesReceived, stats.TotalBytes)
 		}
 	}
@@ -642,14 +643,14 @@ func createSSHConfig() *ssh.ServerConfig {
 			if portStr != "" {
 				fmt.Sscanf(portStr, "%d", &clientPort)
 			}
-			
+
 			// Extract server port from local address
 			_, serverPortStr, _ := net.SplitHostPort(c.LocalAddr().String())
 			serverPort := 0
 			if serverPortStr != "" {
 				fmt.Sscanf(serverPortStr, "%d", &serverPort)
 			}
-			
+
 			if isBlocked(ip) {
 				log.Printf("⛔ Blocked IP tried to connect: %s", ip)
 				return nil, fmt.Errorf("your IP is blocked")
@@ -657,32 +658,32 @@ func createSSHConfig() *ssh.ServerConfig {
 
 			if user, ok := users[c.User()]; ok && user.Password == string(pass) {
 				delete(failedAttempts, ip) // reset count
-				
+
 				// Check traffic limit before allowing authentication
 				if err := checkUserTrafficLimit(c.User(), user.MaxTotalMB); err != nil {
 					log.Printf("🚫 User %s from %s rejected: traffic limit exceeded", c.User(), ip)
 					return nil, err // Return the error message to user
 				}
-				
+
 				// Get session manager
 				sm := GetSessionManager()
-				
+
 				// Get client version (before handshake, we don't have full metadata yet)
 				// We'll use IP and username for now, and update with client version in handleConnection
 				clientVersion := "SSH-2.0-Unknown" // Will be updated in handleConnection
-				
+
 				// Create session
 				sessionID, err := sm.CreateSession(c.User(), ip, clientVersion)
 				if err != nil {
 					log.Printf("🚫 Failed to create session for %s from %s: %v", c.User(), ip, err)
 					return nil, err // Return the actual error message to user
 				}
-				
+
 				// Store sessionID in memory for later use in handleConnection
 				sessionMetadata.Store(c.User()+"|"+ip, sessionID)
-				
+
 				log.Printf("✅ User %s (%s) authenticated from %s [Session: %s]", c.User(), user.Role, ip, sessionID[:16]+"...")
-				
+
 				// Return sessionID in permissions for later retrieval
 				perms := &ssh.Permissions{
 					Extensions: map[string]string{
@@ -710,23 +711,22 @@ func createSSHConfig() *ssh.ServerConfig {
 	// Configure SSH algorithms for better performance
 	config.Config = ssh.Config{
 		Ciphers: []string{
-			"chacha20-poly1305@openssh.com",     // Fast & secure
-			"aes128-gcm@openssh.com",            // Lightweight
-			"aes256-ctr",                        // Compatibility for older clients
+			"chacha20-poly1305@openssh.com", // Fast & secure
+			"aes128-gcm@openssh.com",        // Lightweight
+			"aes256-ctr",                    // Compatibility for older clients
 			"aes192-ctr",
 			"aes128-ctr",
 		},
 		KeyExchanges: []string{
-			"curve25519-sha256",                // Extremely Fast
-			"diffie-hellman-group14-sha1",      // Compatible fallback
+			"curve25519-sha256",           // Extremely Fast
+			"diffie-hellman-group14-sha1", // Compatible fallback
 		},
 		MACs: []string{
-			"hmac-sha2-256-etm@openssh.com",    // Secure
-			"hmac-sha2-256",                    // Compatibility
-			"hmac-sha1",                        // Fallback for old clients
+			"hmac-sha2-256-etm@openssh.com", // Secure
+			"hmac-sha2-256",                 // Compatibility
+			"hmac-sha1",                     // Fallback for old clients
 		},
 	}
-	
 
 	// Get private key file path from config (default to "id_rsa" if not specified)
 	privateKeyFile := serverConfig.PrivateKeyFile
@@ -785,7 +785,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 				height := uint32(req.Payload[4])<<24 | uint32(req.Payload[5])<<16 | uint32(req.Payload[6])<<8 | uint32(req.Payload[7])
 				pixelWidth := uint32(req.Payload[8])<<24 | uint32(req.Payload[9])<<16 | uint32(req.Payload[10])<<8 | uint32(req.Payload[11])
 				pixelHeight := uint32(req.Payload[12])<<24 | uint32(req.Payload[13])<<16 | uint32(req.Payload[14])<<8 | uint32(req.Payload[15])
-				
+
 				select {
 				case winCh <- &WindowSize{Width: width, Height: height, PixelWidth: pixelWidth, PixelHeight: pixelHeight}:
 				default:
@@ -802,7 +802,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 				}
 				continue
 			}
-			
+
 			// Check if user has admin role for shell access
 			if user.Role != "admin" {
 				channel.Write([]byte("❌ Access Denied: Shell access is restricted to admin users only\n"))
@@ -813,7 +813,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 				}
 				continue
 			}
-			
+
 			if req.WantReply {
 				req.Reply(true, nil)
 			}
@@ -835,7 +835,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 8.3
+🛡️  Welcome to Abdal 4iProto Server ver 8.4
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -870,13 +870,13 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 
 	// Get session manager
 	sm := GetSessionManager()
-	
+
 	// Extract sessionID from permissions (set during PasswordCallback)
 	username := sshConn.User()
 	userIP, _, _ := net.SplitHostPort(sshConn.RemoteAddr().String())
 	clientVersionBytes := sshConn.ClientVersion()
 	clientVersion := string(clientVersionBytes)
-	
+
 	var sessionID string
 	// Try to get sessionID from permissions first
 	perms := sshConn.Permissions
@@ -885,14 +885,14 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 			sessionID = sid
 		}
 	}
-	
+
 	// If not found in permissions, try to get from memory (fallback)
 	if sessionID == "" {
 		if sid, ok := sessionMetadata.Load(username + "|" + userIP); ok {
 			sessionID = sid.(string)
 		}
 	}
-	
+
 	// Validate session if sessionID exists
 	if sessionID != "" {
 		// Check if session is valid
@@ -900,26 +900,26 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 			log.Printf("🔒 Invalid or expired session for user %s from %s, closing connection", username, userIP)
 			return // Connection will be closed by defer
 		}
-		
+
 		// Register connection with session manager
 		sm.RegisterConnection(sessionID, sshConn)
-		
+
 		// Update client version (was unknown during PasswordCallback)
 		if err := sm.UpdateSessionClientVersion(sessionID, clientVersion); err != nil {
 			log.Printf("⚠️ Failed to update session client version: %v", err)
 		}
-		
+
 		// Update last seen
 		if err := sm.UpdateSessionLastSeen(sessionID); err != nil {
 			log.Printf("⚠️ Failed to update session last seen: %v", err)
 		}
-		
+
 		// Unregister on connection close
 		defer func() {
 			sm.UnregisterConnection(sessionID)
 			sm.CloseSession(sessionID)
 		}()
-		
+
 		log.Printf("🔐 Session validated: %s for user %s from %s", sessionID[:16]+"...", username, userIP)
 	} else {
 		log.Printf("⚠️ No sessionID found for user %s from %s, connection may not be tracked", username, userIP)
@@ -1016,7 +1016,7 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	}
 
 	target := fmt.Sprintf("%s:%d", req.HostToConnect, req.PortToConnect)
-	
+
 	// Check if the target domain/IP is blocked for this user
 	if isDomainOrIPBlocked(username, req.HostToConnect) {
 		log.Printf("🚫 User %s tried to access blocked target: %s", username, req.HostToConnect)
@@ -1024,17 +1024,17 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		newChannel.Reject(ssh.Prohibited, "access to this domain/IP is blocked")
 		return
 	}
-	
+
 	// Log user access if logging is enabled for this user
 	logUserAccess(username, req.HostToConnect, userIP)
-	
+
 	// Create optimized TCP connection
 	destConn, err := net.Dial("tcp", target)
 	if err != nil {
 		newChannel.Reject(ssh.ConnectionFailed, "could not connect to target")
 		return
 	}
-	
+
 	// Optimize TCP connection settings for better performance
 	if tcpConn, ok := destConn.(*net.TCPConn); ok {
 		// Enable TCP_NODELAY for lower latency
@@ -1063,17 +1063,17 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 
 	// Get rate limiter for this user
 	userLimiter := getUserRateLimiter(username)
-	
+
 	// Create throttled reader/writer if rate limiting is enabled
 	var downloadReader io.Reader = destConn
 	var downloadWriter io.Writer = channel
 	var uploadReader io.Reader = channel
 	var uploadWriter io.Writer = destConn
-	
+
 	if userLimiter != nil {
 		// For download: throttle writing to channel (data from server to client)
 		downloadWriter = &throttledWriter{w: channel, limiter: userLimiter, username: username}
-		
+
 		// For upload: throttle writing to destConn (data from client to server)
 		uploadWriter = &throttledWriter{w: destConn, limiter: userLimiter, username: username}
 	}
@@ -1091,22 +1091,22 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		defer wg.Done()
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:
 				// Get current traffic values
 				currentSent := bytesSent.Load()
 				currentReceived := bytesReceived.Load()
-				
+
 				// Calculate delta since last update
 				sentDelta := currentSent - lastSent
 				receivedDelta := currentReceived - lastReceived
-				
+
 				if sentDelta > 0 || receivedDelta > 0 {
 					// Update traffic stats in real-time
 					limitExceededFlag := updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
-					
+
 					if limitExceededFlag {
 						// Limit exceeded, signal to close connection
 						limitExceeded <- true
@@ -1115,10 +1115,10 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 						destConn.Close()
 						return
 					}
-					
+
 					// Save to file every 2 seconds
 					saveTrafficStatsToFile(username)
-					
+
 					// Update last values
 					lastSent = currentSent
 					lastReceived = currentReceived
@@ -1133,10 +1133,10 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	go func() {
 		defer wg.Done()
 		defer channel.CloseWrite()
-		
+
 		buf := make([]byte, bufferSize)
 		totalBytes := int64(0)
-		
+
 		for {
 			// Check if limit exceeded
 			select {
@@ -1144,13 +1144,13 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 				return
 			default:
 			}
-			
+
 			// Read with throttling
 			n, err := downloadReader.Read(buf)
 			if n > 0 {
 				bytesReceived.Add(int64(n))
 				totalBytes += int64(n)
-				
+
 				// Write with throttling
 				if _, writeErr := downloadWriter.Write(buf[:n]); writeErr != nil {
 					break
@@ -1160,7 +1160,7 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 				break
 			}
 		}
-		
+
 		log.Printf("📥 %s received %d bytes from %s", username, totalBytes, target)
 	}()
 
@@ -1168,10 +1168,10 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	go func() {
 		defer wg.Done()
 		defer destConn.Close()
-		
+
 		buf := make([]byte, bufferSize)
 		totalBytes := int64(0)
-		
+
 		for {
 			// Check if limit exceeded
 			select {
@@ -1179,13 +1179,13 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 				return
 			default:
 			}
-			
+
 			// Read with throttling
 			n, err := uploadReader.Read(buf)
 			if n > 0 {
 				bytesSent.Add(int64(n))
 				totalBytes += int64(n)
-				
+
 				// Write with throttling
 				if _, writeErr := uploadWriter.Write(buf[:n]); writeErr != nil {
 					break
@@ -1195,7 +1195,7 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 				break
 			}
 		}
-		
+
 		log.Printf("📤 %s sent %d bytes to %s", username, totalBytes, target)
 	}()
 
@@ -1204,7 +1204,7 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	// Final update after connection closes
 	sent := bytesSent.Load()
 	received := bytesReceived.Load()
-	
+
 	// Update final traffic stats (in case there's any remaining delta)
 	if sent > lastSent || received > lastReceived {
 		sentDelta := sent - lastSent
@@ -1222,8 +1222,8 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 		stats.LastBytesTotal = sent + received
 		stats.LastTimestamp = time.Now().Format(time.RFC3339)
 		saveTrafficStatsToFile(username)
-		
-		log.Printf("🧠 [MEMORY] Final traffic update for %s - Session: ↑%dB ↓%dB | Total: ↑%dB ↓%dB 📦%dB", 
+
+		log.Printf("🧠 [MEMORY] Final traffic update for %s - Session: ↑%dB ↓%dB | Total: ↑%dB ↓%dB 📦%dB",
 			username, sent, received, stats.TotalBytesSent, stats.TotalBytesReceived, stats.TotalBytes)
 	}
 }
@@ -1265,12 +1265,12 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 		}
 		var lb [2]byte
 		binary.BigEndian.PutUint16(lb[:], uint16(len(payload)))
-		
+
 		var writer io.Writer = w
 		if userLimiter != nil {
 			writer = &throttledWriter{w: w, limiter: userLimiter, username: username}
 		}
-		
+
 		if _, err := writer.Write(lb[:]); err != nil {
 			return err
 		}
@@ -1309,30 +1309,30 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	var bytesReceived atomic.Int64
 	var lastSent int64 = 0
 	var lastReceived int64 = 0
-	
+
 	// Channel to signal when connection should be closed (limit exceeded)
 	limitExceeded := make(chan bool, 1)
-	
+
 	// Real-time traffic update goroutine (updates every 1 second)
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:
 				// Get current traffic values
 				currentSent := bytesSent.Load()
 				currentReceived := bytesReceived.Load()
-				
+
 				// Calculate delta since last update
 				sentDelta := currentSent - lastSent
 				receivedDelta := currentReceived - lastReceived
-				
+
 				if sentDelta > 0 || receivedDelta > 0 {
 					// Update traffic stats in real-time
 					limitExceededFlag := updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
-					
+
 					if limitExceededFlag {
 						// Limit exceeded, signal to close connection
 						limitExceeded <- true
@@ -1341,10 +1341,10 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 						udpConn.Close()
 						return
 					}
-					
+
 					// Save to file every 2 seconds
 					saveTrafficStatsToFile(username)
-					
+
 					// Update last values
 					lastSent = currentSent
 					lastReceived = currentReceived
@@ -1359,12 +1359,12 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	go func() {
 		defer udpConn.Close()
 		defer channel.CloseWrite()
-		
+
 		var udpWriter io.Writer = udpConn
 		if userLimiter != nil {
 			udpWriter = &throttledWriter{w: udpConn, limiter: userLimiter, username: username}
 		}
-		
+
 		for {
 			// Check if limit exceeded
 			select {
@@ -1372,7 +1372,7 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 				return
 			default:
 			}
-			
+
 			payload, err := readFrame(channel)
 			if err != nil {
 				return
@@ -1388,12 +1388,12 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	// UDP → SSH (with framing and throttling)
 	go func() {
 		defer channel.Close()
-		
+
 		var channelWriter io.Writer = channel
 		if userLimiter != nil {
 			channelWriter = &throttledWriter{w: channel, limiter: userLimiter, username: username}
 		}
-		
+
 		buf := make([]byte, 65535) // Maximum UDP packet size
 		for {
 			// Check if limit exceeded
@@ -1402,12 +1402,12 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 				return
 			default:
 			}
-			
+
 			n, _, err := udpConn.ReadFromUDP(buf)
 			if err != nil {
 				return
 			}
-			
+
 			// Write with throttling (throttling is applied in writeFrame)
 			if err := writeFrame(channelWriter, buf[:n]); err != nil {
 				return
@@ -1416,14 +1416,14 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 			}
 		}
 	}()
-	
+
 	// Wait for both goroutines to finish
 	// Final update after connection closes
 	time.Sleep(100 * time.Millisecond) // Give goroutines time to finish
-	
+
 	sent := bytesSent.Load()
 	received := bytesReceived.Load()
-	
+
 	// Update final traffic stats (in case there's any remaining delta)
 	if sent > lastSent || received > lastReceived {
 		sentDelta := sent - lastSent
@@ -1431,7 +1431,7 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 		updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
 		saveTrafficStatsToFile(username)
 	}
-	
+
 	// Update session values (for last session stats)
 	statsAny, ok := trafficMap.Load(username)
 	if ok {
@@ -1452,7 +1452,7 @@ func logInvalidLogin(username string, password string, ip string, clientPort int
 		log.Printf("Failed to get executable directory: %v", err)
 		return
 	}
-	
+
 	logEntry := fmt.Sprintf(
 		"[❌ Invalid Login] [%s] IP: %s | Client Port: %d | Server Port: %d | Username: %q | Password: %q\n",
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -1484,7 +1484,7 @@ func logBlockedAccess(username string, target string, userIP string) {
 		log.Printf("❌ Failed to get executable directory: %v", err)
 		return
 	}
-	
+
 	// Create blocked_access directory if it doesn't exist
 	blockedDir := filepath.Join(exeDir, "blocked_access")
 	if err := os.MkdirAll(blockedDir, 0755); err != nil {
@@ -1566,10 +1566,10 @@ func startServer() {
 	loadUsers("users.json")
 	loadServerConfig("server_config.json")
 	loadBlockedIPs()
-	
+
 	// Load existing traffic files to preserve traffic statistics across restarts
 	loadExistingTrafficFiles()
-	
+
 	// Initialize session manager and start cleanup routine
 	sm := GetSessionManager()
 	sm.StartCleanupRoutine()
@@ -1618,7 +1618,7 @@ func startServer() {
 			log.Printf("❌ Failed to get executable directory: %v", err)
 			return
 		}
-		
+
 		// Create users_traffic directory if it doesn't exist
 		trafficDir := filepath.Join(exeDir, "users_traffic")
 		if err := os.MkdirAll(trafficDir, 0755); err != nil {

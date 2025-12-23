@@ -53,19 +53,57 @@ func (ws *WindowsService) Execute(args []string, r <-chan svc.ChangeRequest, cha
 	// Create context for graceful shutdown
 	ws.ctx, ws.cancel = context.WithCancel(context.Background())
 
+	// Channel to signal when server is ready
+	serverReady := make(chan bool, 1)
+	serverError := make(chan error, 1)
+
 	// Start the server in a goroutine
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("❌ Server panic recovered: %v", r)
+				select {
+				case serverError <- fmt.Errorf("server panic: %v", r):
+				default:
+				}
 			}
 		}()
 		
 		// Call the main server function
+		// startServer() is blocking, so we signal ready after initialization
+		// Give server time to load configs and start listeners
+		go func() {
+			time.Sleep(3 * time.Second) // Give server time to initialize listeners
+			select {
+			case serverReady <- true:
+			default:
+			}
+		}()
+		
 		startServer()
 	}()
 
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+	// Wait for server to be ready or timeout (max 25 seconds to avoid Windows timeout)
+	select {
+	case <-serverReady:
+		// Server initialized successfully
+		changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+		LogToEventLog("Abdal 4iProto Server service started successfully")
+	case err := <-serverError:
+		// Server failed to start
+		LogToEventLog(fmt.Sprintf("Abdal 4iProto Server service failed to start: %v", err))
+		changes <- svc.Status{State: svc.Stopped}
+		return false, 1
+	case <-time.After(25 * time.Second):
+		// Timeout - mark as running to avoid service manager timeout (1053 error)
+		// The server is likely still initializing or already running
+		changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+		LogToEventLog("Abdal 4iProto Server service starting (initialization timeout, but continuing)")
+	case <-ws.ctx.Done():
+		// Context cancelled before start
+		changes <- svc.Status{State: svc.Stopped}
+		return false, 1
+	}
 
 	// Service control loop
 	for {

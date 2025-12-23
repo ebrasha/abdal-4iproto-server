@@ -129,7 +129,7 @@ if %errorLevel% equ 0 (
 :: Install the service
 color 0B
 echo [INFO] Installing service "%SERVICE_NAME%"...
-sc create "%SERVICE_NAME%" binPath= "\"%CURRENT_DIR%%EXECUTABLE_NAME%\"" DisplayName= "%SERVICE_DISPLAY_NAME%" start= auto
+sc create "%SERVICE_NAME%" binPath= "\"%CURRENT_DIR%%EXECUTABLE_NAME%\" -service" DisplayName= "%SERVICE_DISPLAY_NAME%" start= auto
 
 if %errorLevel% equ 0 (
     color 0A
