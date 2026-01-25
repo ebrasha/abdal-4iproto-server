@@ -268,7 +268,7 @@ Traffic data is automatically saved to `traffic_username.json` files:
 - Console output: Real-time connection and traffic logs
 
 
-## Complete Traffic Forwarding Guide from an Iranian Server to 4iProto Server
+##🔀 Complete Traffic Forwarding Guide from an Iranian Server to 4iProto Server
 
 <div align="center">
   <img src="masquerade.jpg" alt="Complete Traffic Forwarding Guide from an Iranian Server to 4iProto Server"  >
