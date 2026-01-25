@@ -283,6 +283,69 @@ sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
 - `blocked_ips.json`: مدیریت آدرس‌های IP مسدود شده
 - خروجی کنسول: ثبت‌های آنی اتصال و ترافیک
 
+
+## راهنمای ارسال کامل ترافیک یک سرور ایرانی به سرور 4iProto
+
+<div align="center">
+  <img src="masquerade.jpg" alt="راهنمای ارسال کامل ترافیک یک سرور ایرانی به سرور 4iProto"  >
+</div>
+
+این راهنما توضیح می دهد چگونه با استفاده از IP Forwarding و iptables NAT کلیه ترافیک ورودی یک سرور Linux را به سرور مقصد 4iProto منتقل کنید. این سناریو برای Full Traffic Forwarding, Transparent Proxy و Gateway Relay استفاده می شود.
+
+
+### پیش نیازها
+
+- سیستم عامل Linux
+- دسترسی root
+- فعال بودن iptables
+- IP معتبر سرور 4iProto
+- آشنایی پایه با NAT, DNAT, SNAT, Routing
+
+
+### مرحله 1: فعال سازی IP Forwarding
+
+```bash
+sysctl net.ipv4.ip_forward=1
+```
+
+برای دائمی کردن تنظیم:
+
+```bash
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+```
+
+
+### مرحله 2: انتقال پورت SSH به سرور دیگر
+
+```bash
+iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination IRAN_IP
+```
+
+ 
+
+### مرحله 3: ارسال کل ترافیک به سرور 4iProto
+
+```bash
+iptables -t nat -A PREROUTING -j DNAT --to-destination 4iProto_IP
+```
+
+ 
+
+### مرحله 4: فعال سازی Source NAT
+
+```bash
+iptables -t nat -A POSTROUTING -j MASQUERADE
+```
+
+### نکات مهم
+
+- Rule پورت 22 باید قبل از Rule کلی PREROUTING باشد
+- قبل از اعمال Rule ها دسترسی SSH جایگزین داشته باشید
+- در صورت استفاده از firewalld یا ufw هماهنگ شود
+
+
+
 ## 🔒 ویژگی‌های امنیتی
 
 ### محافظت در برابر بروتفورس

@@ -267,6 +267,62 @@ Traffic data is automatically saved to `traffic_username.json` files:
 - `blocked_ips.json`: Manages blocked IP addresses
 - Console output: Real-time connection and traffic logs
 
+
+## Complete Traffic Forwarding Guide from an Iranian Server to 4iProto Server
+
+<div align="center">
+  <img src="masquerade.jpg" alt="Complete Traffic Forwarding Guide from an Iranian Server to 4iProto Server"  >
+</div>
+
+This guide explains how to use IP Forwarding and iptables NAT to redirect all incoming traffic from a Linux server to a 4iProto destination server. This scenario is used for Full Traffic Forwarding, Transparent Proxy, and Gateway Relay.
+
+### Prerequisites
+
+- Linux operating system
+- Root access
+- iptables installed and active
+- Valid 4iProto server IP
+- Basic understanding of NAT, DNAT, SNAT, Routing
+
+### Step 1: Enable IP Forwarding
+
+```bash
+sysctl net.ipv4.ip_forward=1
+```
+
+To make it permanent:
+
+```bash
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+```
+
+### Step 2: Redirect SSH Port to Another Server
+
+```bash
+iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination IRAN_IP
+```
+
+### Step 3: Forward All Traffic to 4iProto Server
+
+```bash
+iptables -t nat -A PREROUTING -j DNAT --to-destination 4iProto_IP
+```
+
+### Step 4: Enable Source NAT
+
+```bash
+iptables -t nat -A POSTROUTING -j MASQUERADE
+```
+
+### Important Notes
+
+- The SSH port rule must be applied before the general PREROUTING rule
+- Ensure alternative SSH access before applying rules
+- Adjust firewall settings if using firewalld or ufw
+
+
+
 ## 🔒 Security Features
 
 ### Brute Force Protection
