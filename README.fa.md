@@ -305,12 +305,6 @@ sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
 ### مرحله 1: فعال سازی IP Forwarding
 
 ```bash
-sysctl net.ipv4.ip_forward=1
-```
-
-برای دائمی کردن تنظیم:
-
-```bash
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 sysctl -p
 ```

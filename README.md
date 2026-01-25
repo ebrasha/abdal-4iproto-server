@@ -287,12 +287,6 @@ This guide explains how to use IP Forwarding and iptables NAT to redirect all in
 ### Step 1: Enable IP Forwarding
 
 ```bash
-sysctl net.ipv4.ip_forward=1
-```
-
-To make it permanent:
-
-```bash
 echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 sysctl -p
 ```
