@@ -45,25 +45,39 @@ var sessionMetadata sync.Map // key: sessionID, value: sessionInfo (username, ip
 // Rate limiters per user: username -> *rate.Limiter
 var rateLimiters sync.Map // key: username, value: *rate.Limiter
 
-// SetExecutableDir changes current working directory to exe dir and returns it.
+// Cached executable directory to avoid repeated os.Executable / os.Chdir calls
+// which cause global-state races and unnecessary syscall churn under load.
+var (
+	cachedExeDir  string
+	cachedExeErr  error
+	exeDirOnce    sync.Once
+)
+
+// SetExecutableDir returns (and on first call, sets) the executable directory.
+// The chdir and symlink resolution happen exactly once for the lifetime of the
+// process. Subsequent calls are cheap and goroutine-safe.
 func SetExecutableDir() (string, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("failed to get executable path: %w", err)
-	}
+	exeDirOnce.Do(func() {
+		exePath, err := os.Executable()
+		if err != nil {
+			cachedExeErr = fmt.Errorf("failed to get executable path: %w", err)
+			return
+		}
 
-	exePath, err = filepath.EvalSymlinks(exePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve symlinks: %w", err)
-	}
+		exePath, err = filepath.EvalSymlinks(exePath)
+		if err != nil {
+			cachedExeErr = fmt.Errorf("failed to resolve symlinks: %w", err)
+			return
+		}
 
-	exeDir := filepath.Dir(exePath)
-
-	if err := os.Chdir(exeDir); err != nil {
-		return "", fmt.Errorf("failed to change working directory: %w", err)
-	}
-
-	return exeDir, nil
+		dir := filepath.Dir(exePath)
+		if err := os.Chdir(dir); err != nil {
+			cachedExeErr = fmt.Errorf("failed to change working directory: %w", err)
+			return
+		}
+		cachedExeDir = dir
+	})
+	return cachedExeDir, cachedExeErr
 }
 
 // getTrafficMapSize returns the number of entries in trafficMap
@@ -137,8 +151,21 @@ type BlockedIPs struct {
 	Blocked []string `json:"blocked"`
 }
 
-var blockedIPs BlockedIPs
-var failedAttempts = make(map[string]int)
+// blockedIPs holds the canonical on-disk slice form for serialization.
+// blockedIPsSet provides O(1) thread-safe lookups for hot-path checks.
+// Both are kept in sync under blockedIPsMu.
+var (
+	blockedIPs    BlockedIPs
+	blockedIPsSet = make(map[string]struct{})
+	blockedIPsMu  sync.RWMutex
+)
+
+// failedAttempts tracks failed auth counts per IP. Access is protected by
+// failedAttemptsMu to avoid concurrent map writes under brute-force load.
+var (
+	failedAttempts   = make(map[string]int)
+	failedAttemptsMu sync.Mutex
+)
 
 func loadUsers(path string) {
 	// Get executable directory and use it for file paths
@@ -226,39 +253,80 @@ func loadBlockedIPs() {
 	exeDir, err := SetExecutableDir()
 	if err != nil {
 		log.Printf("Failed to get executable directory: %v", err)
+		blockedIPsMu.Lock()
 		blockedIPs = BlockedIPs{}
+		blockedIPsSet = make(map[string]struct{})
+		blockedIPsMu.Unlock()
 		return
 	}
 
 	fullPath := filepath.Join(exeDir, "blocked_ips.json")
 	data, err := os.ReadFile(fullPath)
+
+	blockedIPsMu.Lock()
+	defer blockedIPsMu.Unlock()
+
 	if err != nil {
 		blockedIPs = BlockedIPs{}
+		blockedIPsSet = make(map[string]struct{})
 		return
 	}
+
 	_ = json.Unmarshal(data, &blockedIPs)
+
+	// Rebuild the fast-lookup set, deduplicating any legacy duplicates.
+	newSet := make(map[string]struct{}, len(blockedIPs.Blocked))
+	uniq := blockedIPs.Blocked[:0]
+	for _, ip := range blockedIPs.Blocked {
+		if _, ok := newSet[ip]; ok {
+			continue
+		}
+		newSet[ip] = struct{}{}
+		uniq = append(uniq, ip)
+	}
+	blockedIPs.Blocked = uniq
+	blockedIPsSet = newSet
 }
 
+// saveBlockedIPs persists the blocked IP list. Caller must NOT hold blockedIPsMu.
 func saveBlockedIPs() {
-	// Get executable directory and use it for file paths
 	exeDir, err := SetExecutableDir()
 	if err != nil {
 		log.Printf("Failed to get executable directory: %v", err)
 		return
 	}
 
+	blockedIPsMu.RLock()
 	data, _ := json.MarshalIndent(blockedIPs, "", "  ")
+	blockedIPsMu.RUnlock()
+
 	fullPath := filepath.Join(exeDir, "blocked_ips.json")
 	_ = os.WriteFile(fullPath, data, 0644)
 }
 
+// isBlocked performs an O(1) thread-safe lookup against the in-memory set.
 func isBlocked(ip string) bool {
-	for _, b := range blockedIPs.Blocked {
-		if b == ip {
-			return true
-		}
+	blockedIPsMu.RLock()
+	_, ok := blockedIPsSet[ip]
+	blockedIPsMu.RUnlock()
+	return ok
+}
+
+// addBlockedIP adds an IP to the block list (deduplicated) and persists it
+// asynchronously. Returns true if the IP was newly added.
+func addBlockedIP(ip string) bool {
+	blockedIPsMu.Lock()
+	if _, ok := blockedIPsSet[ip]; ok {
+		blockedIPsMu.Unlock()
+		return false
 	}
-	return false
+	blockedIPsSet[ip] = struct{}{}
+	blockedIPs.Blocked = append(blockedIPs.Blocked, ip)
+	blockedIPsMu.Unlock()
+
+	// Persist outside the lock to avoid holding it during disk IO.
+	go saveBlockedIPs()
+	return true
 }
 
 // End Block IPs
@@ -633,6 +701,12 @@ func loadExistingTrafficFiles() {
 	}
 }
 
+// cachedSSHConfig stores the single shared *ssh.ServerConfig used by every
+// accepted connection. Building this struct involves reading and parsing the
+// host private key (an expensive crypto operation) so it MUST be built once
+// at startup, not per-connection.
+var cachedSSHConfig *ssh.ServerConfig
+
 // Create SSH server config
 func createSSHConfig() *ssh.ServerConfig {
 	config := &ssh.ServerConfig{
@@ -657,7 +731,10 @@ func createSSHConfig() *ssh.ServerConfig {
 			}
 
 			if user, ok := users[c.User()]; ok && user.Password == string(pass) {
-				delete(failedAttempts, ip) // reset count
+				// Reset failed attempts counter atomically
+				failedAttemptsMu.Lock()
+				delete(failedAttempts, ip)
+				failedAttemptsMu.Unlock()
 
 				// Check traffic limit before allowing authentication
 				if err := checkUserTrafficLimit(c.User(), user.MaxTotalMB); err != nil {
@@ -694,14 +771,24 @@ func createSSHConfig() *ssh.ServerConfig {
 			}
 
 			logInvalidLogin(c.User(), string(pass), ip, clientPort, serverPort)
-			// افزايش تعداد تلاش ناموفق
-			failedAttempts[ip]++
-			log.Printf("❌ Failed login from %s (%d attempts)", ip, failedAttempts[ip])
 
-			if failedAttempts[ip] >= serverConfig.MaxAuthAttempts {
-				log.Printf("🚫 Blocking IP: %s", ip)
-				blockedIPs.Blocked = append(blockedIPs.Blocked, ip)
-				saveBlockedIPs()
+			// Increment failed attempts under lock; release before any IO
+			failedAttemptsMu.Lock()
+			failedAttempts[ip]++
+			attempts := failedAttempts[ip]
+			shouldBlock := attempts >= serverConfig.MaxAuthAttempts
+			if shouldBlock {
+				// Free the counter slot once the IP is going on the block list.
+				delete(failedAttempts, ip)
+			}
+			failedAttemptsMu.Unlock()
+
+			log.Printf("❌ Failed login from %s (%d attempts)", ip, attempts)
+
+			if shouldBlock {
+				if addBlockedIP(ip) {
+					log.Printf("🚫 Blocking IP: %s", ip)
+				}
 			}
 
 			return nil, fmt.Errorf("authentication failed")
@@ -835,7 +922,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 8.4
+🛡️  Welcome to Abdal 4iProto Server ver 8.18
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -858,6 +945,17 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 
 // Handle a new SSH connection
 func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
+	// Fast-path reject for already-blocked IPs BEFORE the expensive SSH
+	// handshake (key exchange, cipher init, ...). Without this, every attacker
+	// connection — even from a known-blocked IP — forces a full crypto
+	// negotiation, which is the main reason RAM/CPU spikes during attacks.
+	if remoteIP, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String()); splitErr == nil {
+		if isBlocked(remoteIP) {
+			conn.Close()
+			return
+		}
+	}
+
 	// Optional banner before handshake
 	conn.Write([]byte("Abdal 4iProto Server\n"))
 
@@ -886,12 +984,16 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 		}
 	}
 
-	// If not found in permissions, try to get from memory (fallback)
+	// If not found in permissions, fall back to the metadata map (legacy path).
+	// Either way, we always remove the entry afterwards to prevent the map from
+	// growing unbounded across reconnects.
+	metaKey := username + "|" + userIP
 	if sessionID == "" {
-		if sid, ok := sessionMetadata.Load(username + "|" + userIP); ok {
+		if sid, ok := sessionMetadata.Load(metaKey); ok {
 			sessionID = sid.(string)
 		}
 	}
+	sessionMetadata.Delete(metaKey)
 
 	// Validate session if sessionID exists
 	if sessionID != "" {
@@ -933,19 +1035,29 @@ func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
 	log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), clientVersion)
 	go ssh.DiscardRequests(reqs)
 
-	// Start periodic session last seen update if session exists
+	// Start periodic session last seen update if session exists.
+	// The done channel ensures this goroutine exits as soon as handleConnection
+	// returns — previously it could outlive the connection for the entire
+	// session TTL, accumulating leaked goroutines under high reconnect load.
+	connDone := make(chan struct{})
+	defer close(connDone)
 	if sessionID != "" {
 		go func() {
 			ticker := time.NewTicker(30 * time.Second) // Update every 30 seconds
 			defer ticker.Stop()
-			for range ticker.C {
-				if !sm.IsSessionValid(sessionID) {
-					log.Printf("🔒 Session expired for user %s, stopping updates", username)
+			for {
+				select {
+				case <-connDone:
 					return
-				}
-				if err := sm.UpdateSessionLastSeen(sessionID); err != nil {
-					log.Printf("⚠️ Failed to update session last seen: %v", err)
-					return
+				case <-ticker.C:
+					if !sm.IsSessionValid(sessionID) {
+						log.Printf("🔒 Session expired for user %s, stopping updates", username)
+						return
+					}
+					if err := sm.UpdateSessionLastSeen(sessionID); err != nil {
+						log.Printf("⚠️ Failed to update session last seen: %v", err)
+						return
+					}
 				}
 			}
 		}()
@@ -1086,11 +1198,19 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	var lastSent int64 = 0
 	var lastReceived int64 = 0
 
-	// Real-time traffic update goroutine (updates every 1 second)
+	// Real-time traffic update goroutine.
+	// Memory accounting (limit check) runs every 1s for responsiveness, but
+	// disk persistence is rate-limited (every 5s) to avoid per-second JSON
+	// marshalling + WriteFile, which was a major contributor to allocation
+	// pressure and steady RAM growth. The 10s global flusher in startServer()
+	// remains the safety net so no data is lost.
 	go func() {
 		defer wg.Done()
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
+
+		const saveEveryNTicks = 5
+		tickCount := 0
 
 		for {
 			select {
@@ -1116,8 +1236,11 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 						return
 					}
 
-					// Save to file every 2 seconds
-					saveTrafficStatsToFile(username)
+					tickCount++
+					if tickCount >= saveEveryNTicks {
+						saveTrafficStatsToFile(username)
+						tickCount = 0
+					}
 
 					// Update last values
 					lastSent = currentSent
@@ -1313,10 +1436,15 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	// Channel to signal when connection should be closed (limit exceeded)
 	limitExceeded := make(chan bool, 1)
 
-	// Real-time traffic update goroutine (updates every 1 second)
+	// Real-time traffic update goroutine for UDP (same rationale as TCP):
+	// 1s in-memory updates for limit enforcement, 5s disk persistence to keep
+	// allocation pressure low. Global 10s flusher catches anything missed.
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
+
+		const saveEveryNTicks = 5
+		tickCount := 0
 
 		for {
 			select {
@@ -1342,8 +1470,11 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 						return
 					}
 
-					// Save to file every 2 seconds
-					saveTrafficStatsToFile(username)
+					tickCount++
+					if tickCount >= saveEveryNTicks {
+						saveTrafficStatsToFile(username)
+						tickCount = 0
+					}
 
 					// Update last values
 					lastSent = currentSent
@@ -1574,6 +1705,11 @@ func startServer() {
 	sm := GetSessionManager()
 	sm.StartCleanupRoutine()
 
+	// Build the SSH server config exactly once. Reading + parsing the host key
+	// per-connection used to be one of the biggest sources of allocation churn,
+	// especially under brute-force load.
+	cachedSSHConfig = createSSHConfig()
+
 	// Start DNSTT Gateway if enabled
 	if serverConfig.DNSTTEnabled {
 		go startDNSTTGateway(serverConfig)
@@ -1606,7 +1742,7 @@ func startServer() {
 					tcpConn.SetKeepAlivePeriod(30 * time.Second)
 				}
 
-				go handleConnection(conn, createSSHConfig())
+				go handleConnection(conn, cachedSSHConfig)
 			}
 		}(port)
 	}
