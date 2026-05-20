@@ -58,7 +58,7 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 
 ## 📋 Requirements
 
-- Go 1.19 or higher
+- Go 1.25.10 or higher
 - SSH private key (`id_rsa`)
 - Configuration files (see Setup section)
 
