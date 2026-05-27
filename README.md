@@ -55,6 +55,11 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 
 - **Real-time Bandwidth Enforcement**: Traffic usage is checked every 1–2 seconds. If usage exceeds the defined limit, the session is immediately terminated.
 
+## 🚀 Easy Installation via Abdal 4iProto Cli
+
+[**Abdal 4iProto Cli**](https://github.com/ebrasha/abdal-4iproto-cli) is an advanced CLI tool for managing the Abdal 4iProto Ecosystem. It automatically detects your OS/Architecture, verifies SHA-256 checksums, configures ports, generates SSH keys, and registers persistent system services.
+
+ 
 
 ## 📋 Requirements
 
