@@ -263,6 +263,12 @@ sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
 
 ### 🤖 کلاینت اندروید
 
+💡 **پیشنهاد ما:** کلاینت اختصاصی و بهینه‌شده **Abdal 4iProto Android** را دانلود کنید که بالاترین سطح امنیت و سرعت را بدون نیاز به برنامه‌های جانبی در اختیار شما قرار می‌دهد.
+
+📱 [دانلود کلاینت اختصاصی Abdal 4iProto Android](https://github.com/ebrasha/abdal-4iproto-client-android)
+
+---
+
 [دانلود NapsternetV از گوگل‌پلی](https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv&hl=fa)
 
 [دانلود OpenTunnel از گوگل‌پلی](https://play.google.com/store/apps/details?id=com.opentunnel.app&hl=en&pli=1)
