@@ -241,6 +241,12 @@ sshuttle --dns -r ebrasha@91.107.170.50:2222 0.0.0.0/0 -vv
 
 ### 🤖 Android Client
 
+💡 **Our Recommendation:** We highly recommend using the official **Abdal 4iProto Android Client**. It is custom-built and optimized specifically for this ecosystem, delivering the highest level of security, stability, and speed without the need for third-party configurations.
+
+📱 [Download Official Abdal 4iProto Android Client](https://github.com/ebrasha/abdal-4iproto-client-android)
+
+---
+
 [Download NapsternetV from Google Play](https://play.google.com/store/apps/details?id=com.napsternetlabs.napsternetv&hl=en)
 
 [Download OpenTunnel from Google Play](https://play.google.com/store/apps/details?id=com.opentunnel.app&hl=en&pli=1)
