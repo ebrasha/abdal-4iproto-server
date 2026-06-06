@@ -34,6 +34,7 @@ A high-performance SSH-based tunneling server designed for secure internet acces
 - **UDP Forwarding**: Full UDP traffic forwarding support
 - **Cross-platform**: Runs on both Linux and Windows systems
 - **High Performance**: 10x faster than OpenSSH for tunneling operations
+- **DNSTT Support**: Advanced DNS tunneling for secure traffic routing
 
 ### 🛠️ Management Features
 - **User Management**: JSON-based user authentication system
