@@ -142,7 +142,17 @@ type ServerConfig struct {
 	DNSTTListen     string `json:"dnstt_listen"`     // DNSTT listen address (e.g., ":53")
 	DNSTTResolver   string `json:"dnstt_resolver"`   // DNSTT resolver address (e.g., "8.8.8.8")
 	DNSTTNameserver string `json:"dnstt_nameserver"` // DNSTT nameserver domain (e.g., "dns.example.com")
-	DNSTTPublicKey  string `json:"dnstt_public_key"` // DNSTT public key for session establishment
+	DNSTTPublicKey  string `json:"dnstt_public_key"` // (Deprecated/reserved) legacy DNSTT public key field
+
+	// DNSTTPSK is the pre-shared key used to authenticate the OPEN message of a
+	// DNS tunnel session (HMAC-SHA256). Empty = gateway open to anyone.
+	DNSTTPSK string `json:"dnstt_psk"`
+	// DNSTTMaxSessionsPerIP caps concurrent DNS tunnel sessions per client IP
+	// (anti-abuse). 0 = unlimited.
+	DNSTTMaxSessionsPerIP int `json:"dnstt_max_sessions_per_ip"`
+	// DNSTTIdleTimeoutSec closes a DNS tunnel session after this many seconds
+	// without any traffic. <= 0 falls back to 60 seconds.
+	DNSTTIdleTimeoutSec int `json:"dnstt_idle_timeout_seconds"`
 }
 
 var serverConfig ServerConfig
@@ -922,7 +932,7 @@ func handleSession(channel ssh.Channel, requests <-chan *ssh.Request, username s
 ██████╔╝███████╗██║░░██║░░╚██╔╝░░███████╗██║░░██║
 ╚═════╝░╚══════╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝╚═╝░░╚═╝
 
-🛡️  Welcome to Abdal 4iProto Server ver 8.18
+🛡️  Welcome to Abdal 4iProto Server ver 8.20
 🧠  Developed by: Ebrahim Shafiei (EbraSha)
 ✉️ Prof.Shafiei@Gmail.com
 
@@ -1351,7 +1361,37 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 	}
 }
 
-// Handle UDP forwarding through SSH with length-prefix framing
+// UDP tunneling tuning constants. These govern the custom "direct-udpip"
+// channel used by Abdal proprietary clients (this is NOT OpenSSH UDP).
+const (
+	// udpMaxDatagramSize is the largest single UDP payload that can be framed.
+	// A 2-byte big-endian length prefix bounds this to 65535 bytes.
+	udpMaxDatagramSize = 65535
+
+	// udpSocketBufferSize enlarges the kernel UDP socket buffers so high-rate
+	// flows (gaming, QUIC, media, VPN-over-UDP) do not drop packets under burst.
+	udpSocketBufferSize = 4 * 1024 * 1024 // 4 MB
+
+	// udpReadTick is how often the UDP->SSH reader wakes up to re-check the idle
+	// timeout and the limit-exceeded signal while waiting for inbound datagrams.
+	udpReadTick = 2 * time.Second
+
+	// udpIdleTimeout closes a tunnel that has seen no traffic in either
+	// direction for this long. UDP is connectionless, so without this an
+	// abandoned flow would leak a goroutine + socket indefinitely.
+	udpIdleTimeout = 90 * time.Second
+)
+
+// Handle UDP forwarding through SSH using a length-prefixed datagram framing.
+//
+// Wire framing on the SSH channel (both directions):
+//
+//	[2-byte big-endian length N][N bytes UDP payload]
+//
+// A frame with N == 0 is a no-op keepalive (used to keep NAT mappings and the
+// idle timer fresh without forwarding an empty datagram). One channel maps to
+// exactly one UDP destination, fixed at channel-open time via the standard
+// direct-udpip extra-data record (host, port, originator host, originator port).
 func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string) {
 	type directUDPIPReq struct {
 		HostToConnect     string
@@ -1367,47 +1407,24 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	// Get rate limiter for this user
 	userLimiter := getUserRateLimiter(username)
 
-	// Helper functions for length-prefix framing
-	readFrame := func(r io.Reader) ([]byte, error) {
-		var lb [2]byte
-		if _, err := io.ReadFull(r, lb[:]); err != nil {
-			return nil, err
-		}
-		n := int(binary.BigEndian.Uint16(lb[:]))
-		if n <= 0 || n > 65535 {
-			return nil, fmt.Errorf("bad length")
-		}
-		b := make([]byte, n)
-		_, err := io.ReadFull(r, b)
-		return b, err
-	}
-
-	writeFrame := func(w io.Writer, payload []byte) error {
-		if len(payload) > 65535 {
-			return fmt.Errorf("oversize datagram")
-		}
-		var lb [2]byte
-		binary.BigEndian.PutUint16(lb[:], uint16(len(payload)))
-
-		var writer io.Writer = w
-		if userLimiter != nil {
-			writer = &throttledWriter{w: w, limiter: userLimiter, username: username}
-		}
-
-		if _, err := writer.Write(lb[:]); err != nil {
-			return err
-		}
-		_, err := writer.Write(payload)
-		return err
-	}
-
 	var req directUDPIPReq
 	if err := ssh.Unmarshal(newChannel.ExtraData(), &req); err != nil {
 		newChannel.Reject(ssh.Prohibited, "bad direct-udpip request")
 		return
 	}
 
-	// Use net.ResolveUDPAddr for better hostname resolution
+	// Enforce per-user domain/IP block list (parity with TCP forwarding).
+	if isDomainOrIPBlocked(username, req.HostToConnect) {
+		log.Printf("🚫 User %s tried to access blocked UDP target: %s", username, req.HostToConnect)
+		logBlockedAccess(username, req.HostToConnect, userIP)
+		newChannel.Reject(ssh.Prohibited, "access to this domain/IP is blocked")
+		return
+	}
+
+	// Log user access if logging is enabled for this user.
+	logUserAccess(username, req.HostToConnect, userIP)
+
+	// Resolve and dial the UDP destination.
 	addrStr := net.JoinHostPort(req.HostToConnect, fmt.Sprintf("%d", req.PortToConnect))
 	udpAddr, err := net.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
@@ -1421,6 +1438,10 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 		return
 	}
 
+	// Enlarge socket buffers for high-throughput, bursty UDP traffic.
+	_ = udpConn.SetReadBuffer(udpSocketBufferSize)
+	_ = udpConn.SetWriteBuffer(udpSocketBufferSize)
+
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
 		udpConn.Close()
@@ -1428,17 +1449,30 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	}
 	go ssh.DiscardRequests(requests)
 
+	log.Printf("📡 UDP tunnel opened for %s → %s", username, addrStr)
+
 	var bytesSent atomic.Int64
 	var bytesReceived atomic.Int64
 	var lastSent int64 = 0
 	var lastReceived int64 = 0
 
-	// Channel to signal when connection should be closed (limit exceeded)
-	limitExceeded := make(chan bool, 1)
+	// lastActivity tracks the most recent traffic on either direction (unix
+	// seconds) and drives the idle-timeout based cleanup.
+	var lastActivity atomic.Int64
+	lastActivity.Store(time.Now().Unix())
 
-	// Real-time traffic update goroutine for UDP (same rationale as TCP):
-	// 1s in-memory updates for limit enforcement, 5s disk persistence to keep
-	// allocation pressure low. Global 10s flusher catches anything missed.
+	// limitExceeded signals all goroutines to stop when the traffic cap is hit.
+	limitExceeded := make(chan bool, 1)
+	// done is closed once both transfer goroutines exit, so the stats ticker
+	// stops promptly instead of leaking until an arbitrary timeout.
+	done := make(chan struct{})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Real-time traffic accounting goroutine for UDP (same rationale as TCP):
+	// in-memory limit checks every 1s, disk persistence every 5s. The global
+	// 10s flusher in startServer() is the final safety net.
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -1449,21 +1483,20 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 		for {
 			select {
 			case <-ticker.C:
-				// Get current traffic values
 				currentSent := bytesSent.Load()
 				currentReceived := bytesReceived.Load()
 
-				// Calculate delta since last update
 				sentDelta := currentSent - lastSent
 				receivedDelta := currentReceived - lastReceived
 
 				if sentDelta > 0 || receivedDelta > 0 {
-					// Update traffic stats in real-time
 					limitExceededFlag := updateTrafficStatsRealTime(username, userIP, sentDelta, receivedDelta, maxTotalMB)
 
 					if limitExceededFlag {
-						// Limit exceeded, signal to close connection
-						limitExceeded <- true
+						select {
+						case limitExceeded <- true:
+						default:
+						}
 						log.Printf("🚫 User %s exceeded traffic limit, closing UDP connection", username)
 						channel.Close()
 						udpConn.Close()
@@ -1476,86 +1509,133 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 						tickCount = 0
 					}
 
-					// Update last values
 					lastSent = currentSent
 					lastReceived = currentReceived
 				}
+			case <-done:
+				return
 			case <-limitExceeded:
 				return
 			}
 		}
 	}()
 
-	// SSH → UDP (with framing and throttling)
+	// SSH → UDP: read framed datagrams from the channel, write them to the
+	// destination. Uses fixed reusable buffers (zero per-packet allocation).
 	go func() {
+		defer wg.Done()
 		defer udpConn.Close()
 		defer channel.CloseWrite()
 
-		var udpWriter io.Writer = udpConn
-		if userLimiter != nil {
-			udpWriter = &throttledWriter{w: udpConn, limiter: userLimiter, username: username}
-		}
+		var hdr [2]byte
+		payload := make([]byte, udpMaxDatagramSize)
 
 		for {
-			// Check if limit exceeded
 			select {
 			case <-limitExceeded:
 				return
 			default:
 			}
 
-			payload, err := readFrame(channel)
-			if err != nil {
+			// Read the 2-byte length prefix.
+			if _, err := io.ReadFull(channel, hdr[:]); err != nil {
 				return
 			}
-			if _, err := udpWriter.Write(payload); err != nil {
-				return
-			} else {
-				bytesSent.Add(int64(len(payload) + 2)) // +2 for length prefix
+			n := int(binary.BigEndian.Uint16(hdr[:]))
+
+			// N == 0 is a keepalive: refresh activity and continue.
+			if n == 0 {
+				lastActivity.Store(time.Now().Unix())
+				continue
 			}
+			if n > udpMaxDatagramSize {
+				// Protocol violation; tear the tunnel down.
+				return
+			}
+
+			// Read the exact payload.
+			if _, err := io.ReadFull(channel, payload[:n]); err != nil {
+				return
+			}
+
+			// Apply rate limiting once for the whole datagram (header + body).
+			if userLimiter != nil {
+				if err := userLimiter.WaitN(context.Background(), n+2); err != nil {
+					return
+				}
+			}
+
+			if _, err := udpConn.Write(payload[:n]); err != nil {
+				return
+			}
+
+			bytesSent.Add(int64(n + 2)) // +2 accounts for the length prefix
+			lastActivity.Store(time.Now().Unix())
 		}
 	}()
 
-	// UDP → SSH (with framing and throttling)
+	// UDP → SSH: read datagrams from the destination, frame them, and write a
+	// single combined buffer to the channel (one Write per datagram to minimize
+	// SSH packet overhead). Uses one reusable frame buffer (zero per-packet alloc).
 	go func() {
+		defer wg.Done()
 		defer channel.Close()
 
-		var channelWriter io.Writer = channel
-		if userLimiter != nil {
-			channelWriter = &throttledWriter{w: channel, limiter: userLimiter, username: username}
-		}
+		// frame[0:2] holds the length prefix; frame[2:] holds the payload.
+		frame := make([]byte, 2+udpMaxDatagramSize)
 
-		buf := make([]byte, 65535) // Maximum UDP packet size
 		for {
-			// Check if limit exceeded
 			select {
 			case <-limitExceeded:
 				return
 			default:
 			}
 
-			n, _, err := udpConn.ReadFromUDP(buf)
+			// Wake up periodically to honor the idle timeout and stop signals.
+			_ = udpConn.SetReadDeadline(time.Now().Add(udpReadTick))
+			n, _, err := udpConn.ReadFromUDP(frame[2:])
 			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					// No data this tick; close only if fully idle.
+					if time.Now().Unix()-lastActivity.Load() > int64(udpIdleTimeout.Seconds()) {
+						return
+					}
+					continue
+				}
+				return
+			}
+			if n == 0 {
+				continue
+			}
+
+			binary.BigEndian.PutUint16(frame[:2], uint16(n))
+
+			// Apply rate limiting once for the whole datagram (header + body).
+			if userLimiter != nil {
+				if err := userLimiter.WaitN(context.Background(), n+2); err != nil {
+					return
+				}
+			}
+
+			if _, err := channel.Write(frame[:2+n]); err != nil {
 				return
 			}
 
-			// Write with throttling (throttling is applied in writeFrame)
-			if err := writeFrame(channelWriter, buf[:n]); err != nil {
-				return
-			} else {
-				bytesReceived.Add(int64(n + 2)) // +2 for length prefix
-			}
+			bytesReceived.Add(int64(n + 2)) // +2 accounts for the length prefix
+			lastActivity.Store(time.Now().Unix())
 		}
 	}()
 
-	// Wait for both goroutines to finish
-	// Final update after connection closes
-	time.Sleep(100 * time.Millisecond) // Give goroutines time to finish
+	// Wait for both transfer goroutines to finish, then stop the stats ticker.
+	wg.Wait()
+	close(done)
+
+	log.Printf("🔌 UDP tunnel closed for %s → %s", username, addrStr)
 
 	sent := bytesSent.Load()
 	received := bytesReceived.Load()
 
-	// Update final traffic stats (in case there's any remaining delta)
+	// Final flush of any remaining delta after the tunnel closes.
 	if sent > lastSent || received > lastReceived {
 		sentDelta := sent - lastSent
 		receivedDelta := received - lastReceived
@@ -1572,6 +1652,9 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 		stats.LastBytesTotal = sent + received
 		stats.LastTimestamp = time.Now().Format(time.RFC3339)
 		saveTrafficStatsToFile(username)
+
+		log.Printf("🧠 [MEMORY] Final UDP traffic update for %s - Session: ↑%dB ↓%dB | Total: ↑%dB ↓%dB 📦%dB",
+			username, sent, received, stats.TotalBytesSent, stats.TotalBytesReceived, stats.TotalBytes)
 	}
 }
 

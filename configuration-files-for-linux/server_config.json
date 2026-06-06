@@ -4,5 +4,13 @@
   "max_auth_attempts": 3,
   "server_version": "SSH-2.0-Abdal-4iProto-Server",
   "private_key_file": "id_ed25519",
-  "public_key_file": "id_ed25519.pub"
+  "public_key_file": "id_ed25519.pub",
+  "dnstt_enabled": false,
+  "dnstt_listen": ":53",
+  "dnstt_resolver": "8.8.8.8",
+  "dnstt_nameserver": "dns.example.com",
+  "dnstt_public_key": "",
+  "dnstt_psk": "",
+  "dnstt_max_sessions_per_ip": 8,
+  "dnstt_idle_timeout_seconds": 60
 }
