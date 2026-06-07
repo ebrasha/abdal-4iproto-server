@@ -346,7 +346,7 @@ If you encounter any issues or have configuration problems, please reach out via
 
 ## ❤️ Donation
 If you find this project helpful and would like to support further development, please consider making a donation:
-- [Donate Here](https://ebrasha.com/abdal-donation)
+- [Donate Here](https://t.me/AbdalDonationBot)
 
 ## 🤵 Programmer
 Handcrafted with Passion by **Ebrahim Shafiei (EbraSha)**
