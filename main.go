@@ -153,6 +153,15 @@ type ServerConfig struct {
 	// DNSTTIdleTimeoutSec closes a DNS tunnel session after this many seconds
 	// without any traffic. <= 0 falls back to 60 seconds.
 	DNSTTIdleTimeoutSec int `json:"dnstt_idle_timeout_seconds"`
+
+	// UDPIdleTimeoutSec closes a UDP tunnel after this many seconds with no
+	// traffic in either direction. <= 0 falls back to 90 seconds.
+	UDPIdleTimeoutSec int `json:"udp_idle_timeout_seconds"`
+	// UDPSocketBufferKB sets the kernel read/write buffer size (in KB) for UDP
+	// tunnel sockets. Larger values reduce packet loss under bursty, high-rate
+	// traffic. <= 0 falls back to 4096 KB (4 MB). The effective value is also
+	// capped by the OS (e.g. net.core.rmem_max on Linux).
+	UDPSocketBufferKB int `json:"udp_socket_buffer_kb"`
 }
 
 var serverConfig ServerConfig
@@ -1365,22 +1374,42 @@ func handleDirectTCPIP(newChannel ssh.NewChannel, username string, userIP string
 // channel used by Abdal proprietary clients (this is NOT OpenSSH UDP).
 const (
 	// udpMaxDatagramSize is the largest single UDP payload that can be framed.
-	// A 2-byte big-endian length prefix bounds this to 65535 bytes.
+	// A 2-byte big-endian length prefix bounds this to 65535 bytes. This is a
+	// protocol invariant and is intentionally NOT configurable.
 	udpMaxDatagramSize = 65535
-
-	// udpSocketBufferSize enlarges the kernel UDP socket buffers so high-rate
-	// flows (gaming, QUIC, media, VPN-over-UDP) do not drop packets under burst.
-	udpSocketBufferSize = 4 * 1024 * 1024 // 4 MB
 
 	// udpReadTick is how often the UDP->SSH reader wakes up to re-check the idle
 	// timeout and the limit-exceeded signal while waiting for inbound datagrams.
 	udpReadTick = 2 * time.Second
 
-	// udpIdleTimeout closes a tunnel that has seen no traffic in either
-	// direction for this long. UDP is connectionless, so without this an
-	// abandoned flow would leak a goroutine + socket indefinitely.
-	udpIdleTimeout = 90 * time.Second
+	// defaultUDPSocketBufferBytes is used when udp_socket_buffer_kb is unset
+	// (<= 0) in server_config.json. Enlarges kernel UDP socket buffers so
+	// high-rate flows (gaming, QUIC, media, VPN-over-UDP) do not drop packets.
+	defaultUDPSocketBufferBytes = 4 * 1024 * 1024 // 4 MB
+
+	// defaultUDPIdleTimeoutSec is used when udp_idle_timeout_seconds is unset
+	// (<= 0). A tunnel with no traffic in either direction for this long is
+	// closed so abandoned flows do not leak a goroutine + socket.
+	defaultUDPIdleTimeoutSec = 90
 )
+
+// udpSocketBufferBytes returns the effective UDP socket buffer size in bytes,
+// honoring server_config.json with a safe default fallback.
+func udpSocketBufferBytes() int {
+	if serverConfig.UDPSocketBufferKB > 0 {
+		return serverConfig.UDPSocketBufferKB * 1024
+	}
+	return defaultUDPSocketBufferBytes
+}
+
+// udpIdleTimeoutSeconds returns the effective UDP idle timeout in seconds,
+// honoring server_config.json with a safe default fallback.
+func udpIdleTimeoutSeconds() int64 {
+	if serverConfig.UDPIdleTimeoutSec > 0 {
+		return int64(serverConfig.UDPIdleTimeoutSec)
+	}
+	return defaultUDPIdleTimeoutSec
+}
 
 // Handle UDP forwarding through SSH using a length-prefixed datagram framing.
 //
@@ -1439,8 +1468,13 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 	}
 
 	// Enlarge socket buffers for high-throughput, bursty UDP traffic.
-	_ = udpConn.SetReadBuffer(udpSocketBufferSize)
-	_ = udpConn.SetWriteBuffer(udpSocketBufferSize)
+	// Size is configurable via server_config.json (udp_socket_buffer_kb).
+	socketBufBytes := udpSocketBufferBytes()
+	_ = udpConn.SetReadBuffer(socketBufBytes)
+	_ = udpConn.SetWriteBuffer(socketBufBytes)
+
+	// Resolve the idle timeout once (configurable via udp_idle_timeout_seconds).
+	idleTimeoutSecs := udpIdleTimeoutSeconds()
 
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
@@ -1597,7 +1631,7 @@ func handleDirectUDPIP(newChannel ssh.NewChannel, username string, userIP string
 			if err != nil {
 				if ne, ok := err.(net.Error); ok && ne.Timeout() {
 					// No data this tick; close only if fully idle.
-					if time.Now().Unix()-lastActivity.Load() > int64(udpIdleTimeout.Seconds()) {
+					if time.Now().Unix()-lastActivity.Load() > idleTimeoutSecs {
 						return
 					}
 					continue
