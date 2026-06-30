@@ -3,9 +3,9 @@
  * -------------------------------------------------------------------
  * Project Name : Abdal 4iProto Server
  * File Name    : conpty_windows.go
- * Author       : Ebrahim Shafiei (EbraSha)
+ * Programmer   : Ebrahim Shafiei (EbraSha)
  * Email        : Prof.Shafiei@Gmail.com
- * Created On   : 2025-09-10 22:12:41
+ * Created On   : 2026-06-30 04:12:29
  * Description  : Windows shell support using ConPTY for interactive terminal sessions
  * -------------------------------------------------------------------
  *
@@ -17,18 +17,19 @@
 
 //go:build windows
 
-package main
+package shell
 
 import (
 	"context"
-	"github.com/UserExistsError/conpty"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
 	"os"
+
+	"github.com/UserExistsError/conpty"
+	"golang.org/x/crypto/ssh"
 )
 
-// WindowSize carries terminal size from SSH "window-change"
+// WindowSize carries terminal size from SSH "window-change".
 type WindowSize struct {
 	Width       uint32
 	Height      uint32
@@ -36,10 +37,10 @@ type WindowSize struct {
 	PixelHeight uint32
 }
 
-// Start interactive shell on Windows using ConPTY
-func startShell(channel ssh.Channel, shell string, winCh <-chan *WindowSize) {
+// Start launches an interactive shell on Windows using ConPTY.
+func Start(channel ssh.Channel, shellCmd string, winCh <-chan *WindowSize) {
 	winDir := os.Getenv("SystemRoot")
-	fullPath := winDir + "\\System32\\" + shell
+	fullPath := winDir + "\\System32\\" + shellCmd
 	cpty, err := conpty.Start(fullPath)
 	if err != nil {
 		log.Printf("conpty.Start error: %v", err)

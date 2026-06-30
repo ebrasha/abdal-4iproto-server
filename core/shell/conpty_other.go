@@ -3,9 +3,9 @@
  * -------------------------------------------------------------------
  * Project Name : Abdal 4iProto Server
  * File Name    : conpty_other.go
- * Author       : Ebrahim Shafiei (EbraSha)
+ * Programmer   : Ebrahim Shafiei (EbraSha)
  * Email        : Prof.Shafiei@Gmail.com
- * Created On   : 2025-09-10 22:12:41
+ * Created On   : 2026-06-30 04:12:29
  * Description  : Linux/Unix shell support using PTY for interactive terminal sessions
  * -------------------------------------------------------------------
  *
@@ -17,18 +17,19 @@
 
 //go:build !windows
 
-package main
+package shell
 
 import (
-	"golang.org/x/crypto/ssh"
-	"github.com/creack/pty"
-	"os"
-	"os/exec"
 	"io"
 	"log"
+	"os"
+	"os/exec"
+
+	"github.com/creack/pty"
+	"golang.org/x/crypto/ssh"
 )
 
-// WindowSize carries terminal size from SSH "window-change"
+// WindowSize carries terminal size from SSH "window-change".
 type WindowSize struct {
 	Width       uint32
 	Height      uint32
@@ -36,12 +37,11 @@ type WindowSize struct {
 	PixelHeight uint32
 }
 
-// Start interactive shell on Linux/Unix systems using PTY
-func startShell(channel ssh.Channel, shell string, winCh <-chan *WindowSize) {
-	cmd := exec.Command(shell)
+// Start launches an interactive shell on Linux/Unix systems using PTY.
+func Start(channel ssh.Channel, shellCmd string, winCh <-chan *WindowSize) {
+	cmd := exec.Command(shellCmd)
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
-	// Start the shell attached to a PTY
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		log.Printf("failed to start PTY: %v", err)
@@ -53,20 +53,14 @@ func startShell(channel ssh.Channel, shell string, winCh <-chan *WindowSize) {
 		_ = ptmx.Close()
 	}()
 
-	log.Printf("✅ Started shell process: %s (PID: %d) with PTY", shell, cmd.Process.Pid)
+	log.Printf("✅ Started shell process: %s (PID: %d) with PTY", shellCmd, cmd.Process.Pid)
 
-	// Bidirectional copy: SSH channel <-> PTY
-	// From client to shell
 	go func() {
 		_, _ = io.Copy(ptmx, channel)
 	}()
-
-	// From shell to client
 	go func() {
 		_, _ = io.Copy(channel, ptmx)
 	}()
-
-	// Handle terminal resize events
 	go func() {
 		for ws := range winCh {
 			_ = pty.Setsize(ptmx, &pty.Winsize{
@@ -78,7 +72,6 @@ func startShell(channel ssh.Channel, shell string, winCh <-chan *WindowSize) {
 		}
 	}()
 
-	// Wait for shell to exit
 	if err := cmd.Wait(); err != nil {
 		log.Printf("shell exited with error: %v", err)
 	} else {
