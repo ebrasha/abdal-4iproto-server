@@ -1,0 +1,85 @@
+---
+sidebar_position: 1
+title: Full Traffic Forwarding
+description: Forward all traffic from a Linux relay to Abdal 4iProto Server using iptables NAT
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : traffic-forwarding.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : iptables NAT traffic forwarding guide to 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Complete Traffic Forwarding Guide
+
+This guide explains how to use IP forwarding and iptables NAT to redirect incoming traffic from a Linux relay server to a 4iProto destination server. Typical use cases include full traffic forwarding, transparent proxy setups, and gateway relay designs.
+
+<p align="center">
+  <img
+    src="/img/masquerade.jpg"
+    alt="Complete Traffic Forwarding Guide from an Entry Server to 4iProto Server"
+    width="100%"
+  />
+</p>
+
+:::danger
+Apply these rules carefully. Incorrect NAT rules can lock you out of the relay host. Keep an alternate SSH path ready before changing PREROUTING rules.
+:::
+
+## Prerequisites
+
+- Linux operating system
+- Root access
+- iptables installed and active
+- Valid 4iProto server IP
+- Basic understanding of NAT, DNAT, SNAT, and routing
+
+## Step 1: Enable IP Forwarding
+
+```bash
+echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+sysctl -p
+```
+
+## Step 2: Redirect SSH Port to Another Server
+
+Keep management access reachable by redirecting SSH intentionally (replace placeholders):
+
+```bash
+iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination IRAN_IP
+```
+
+## Step 3: Forward All Traffic to 4iProto Server
+
+```bash
+iptables -t nat -A PREROUTING -j DNAT --to-destination 4iProto_IP
+```
+
+## Step 4: Enable Source NAT
+
+```bash
+iptables -t nat -A POSTROUTING -j MASQUERADE
+```
+
+## Important Notes
+
+- The SSH port rule must be applied before the general PREROUTING rule
+- Ensure alternative SSH access before applying rules
+- Adjust firewall settings if you use `firewalld` or `ufw`
+- Replace `IRAN_IP` and `4iProto_IP` with real addresses for your topology
+
+## Related
+
+- [Network Capabilities](../features/network)
+- [Starting the Server](../usage/starting-server)

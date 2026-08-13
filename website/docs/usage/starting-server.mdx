@@ -1,0 +1,57 @@
+---
+sidebar_position: 1
+title: Starting the Server
+description: How to launch Abdal 4iProto Server after installation
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : starting-server.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Instructions for starting Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Starting the Server
+
+## Direct Binary Start
+
+From the server directory:
+
+```bash
+./abdal-4iproto-server
+```
+
+On Windows:
+
+```powershell
+.\abdal-4iproto-server.exe
+```
+
+## Before You Start Checklist
+
+- `id_rsa` is present
+- `server_config.json` defines the intended ports
+- `users.json` contains production-ready credentials
+- Firewall rules allow the configured ports
+
+## Service Mode
+
+If you installed via [Abdal 4iProto CLI](../getting-started/installation-cli), prefer the system service created by the CLI so the server survives reboots.
+
+## After Startup
+
+1. Confirm listeners are active on configured ports
+2. Authenticate with a test user
+3. Validate tunnel creation from a supported client
+
+Continue with [Connecting to the Server](./connecting).

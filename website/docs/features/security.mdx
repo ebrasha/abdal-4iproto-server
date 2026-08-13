@@ -1,0 +1,80 @@
+---
+sidebar_position: 2
+title: Security Features
+description: Brute-force protection, attack monitoring, roles, and access controls
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : security.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Security features documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Security Features
+
+Abdal 4iProto Server includes built-in defenses for authentication abuse and role separation.
+
+## Built-in Brute Force Protection
+
+- Tracks failed authentication attempts
+- Automatically blocks source IPs after the configured threshold
+- Threshold is controlled by `max_auth_attempts` in `server_config.json`
+
+## Attack Monitoring
+
+- Logs failed login attempts with IP tracking
+- Helps identify attack patterns and noisy sources
+- Works together with persistent blocked IP storage
+
+## Customizable Authentication Limits
+
+Set how many failed attempts are allowed before blocking:
+
+```json
+{
+  "max_auth_attempts": 3
+}
+```
+
+## IP Blocking System
+
+Blocked source IPs are stored in `blocked_ips.json` so protections survive restarts. See [Blocked IPs](../configuration/blocked-ips).
+
+## Server Banner Customization
+
+Use `server_version` to customize or obscure the SSH banner presented to clients.
+
+## Access Levels
+
+| Role | Capabilities |
+| --- | --- |
+| `admin` | Tunneling + operating system shell command execution |
+| `user` | Tunneling only |
+
+## Destination Controls
+
+Per-user policies can also block:
+
+- Unauthorized websites / domains
+- Unauthorized destination IPs
+
+Configure these in [Users Configuration](../configuration/users).
+
+## Related Logs
+
+- `invalid_logins.log`
+- `blocked_ips.json`
+- Console security and connection output
+
+Continue with [Logs](../monitoring/logs).

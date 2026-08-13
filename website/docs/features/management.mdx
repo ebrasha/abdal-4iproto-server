@@ -1,0 +1,60 @@
+---
+sidebar_position: 5
+title: Management Features
+description: User management, shell integration, configuration, and logging
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : management.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Management features documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Management Features
+
+Operators manage Abdal 4iProto Server primarily through JSON files and logs.
+
+## User Management
+
+Authentication and per-user policy live in `users.json`.
+
+- Roles: `admin` / `user`
+- Session limits and TTL
+- Rate limits and traffic quotas
+- Domain/IP destination filters
+- Optional visited-site logging
+
+See [Users Configuration](../configuration/users).
+
+## Shell Integration
+
+- Windows: native `cmd.exe` support for admin shell access
+- Linux: native shell support such as `/bin/bash`
+
+Shell execution is intended for administrator accounts.
+
+## Configuration Management
+
+Server-wide options are stored in `server_config.json`:
+
+- Listening ports
+- Shell path
+- Auth attempt threshold
+- Custom server version string
+
+See [Server Configuration](../configuration/server-config).
+
+## Logging System
+
+The platform records connections, failed logins, and attack-related events for auditing. Details are in [Logs](../monitoring/logs).

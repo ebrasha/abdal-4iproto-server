@@ -1,0 +1,63 @@
+---
+sidebar_position: 1
+title: Traffic Statistics
+description: Understand traffic_username.json persistence and fields
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : traffic-stats.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Traffic statistics file documentation
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Traffic Statistics
+
+Traffic data is automatically saved to files named like `traffic_username.json`.
+
+## Example
+
+```json
+{
+  "username": "user1",
+  "ip": "192.168.1.100",
+  "last_bytes_sent": 1024,
+  "last_bytes_received": 2048,
+  "total_bytes_sent": 1048576,
+  "total_bytes_received": 2097152,
+  "total_bytes": 3145728,
+  "last_timestamp": "2025-01-15T10:30:00Z"
+}
+```
+
+## Field Meanings
+
+| Field | Meaning |
+| --- | --- |
+| `username` | Account name |
+| `ip` | Associated client IP |
+| `last_bytes_sent` | Bytes sent in the latest observed window/session snapshot |
+| `last_bytes_received` | Bytes received in the latest observed window/session snapshot |
+| `total_bytes_sent` | Cumulative bytes sent |
+| `total_bytes_received` | Cumulative bytes received |
+| `total_bytes` | Combined cumulative traffic |
+| `last_timestamp` | Last update timestamp |
+
+## Persistence Cadence
+
+Traffic data is persisted periodically (about every 10 seconds) so operators can inspect usage even after sessions end.
+
+## Related
+
+- [Traffic Monitoring Features](../features/traffic-monitoring)
+- [Accounting Features](../features/accounting)

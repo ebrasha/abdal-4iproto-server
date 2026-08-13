@@ -1,30 +1,98 @@
-/**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : custom.css
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Global theme overrides for Abdal 4iProto Server documentation
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
  */
 
-/* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary: #0f766e;
+  --ifm-color-primary-dark: #0d6962;
+  --ifm-color-primary-darker: #0c635c;
+  --ifm-color-primary-darkest: #0a524c;
+  --ifm-color-primary-light: #11837a;
+  --ifm-color-primary-lighter: #128980;
+  --ifm-color-primary-lightest: #159a90;
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --docusaurus-highlighted-code-line-bg: rgba(15, 118, 110, 0.12);
+  --ifm-font-family-base: 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --abdal-surface: #f3f7f6;
+  --abdal-ink: #102a27;
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #2dd4bf;
+  --ifm-color-primary-dark: #20cbb5;
+  --ifm-color-primary-darker: #1cc0ab;
+  --ifm-color-primary-darkest: #179e8d;
+  --ifm-color-primary-light: #45d9c6;
+  --ifm-color-primary-lighter: #55dccb;
+  --ifm-color-primary-lightest: #7ae4d6;
+  --docusaurus-highlighted-code-line-bg: rgba(45, 212, 191, 0.18);
+  --abdal-surface: #0f1c1a;
+  --abdal-ink: #e7f6f3;
+}
+
+.programmer-card {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(15, 118, 110, 0.02));
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  margin: 1.5rem 0;
+}
+
+.programmer-card img {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--ifm-color-primary);
+}
+
+.programmer-card__meta h3 {
+  margin-bottom: 0.35rem;
+}
+
+.programmer-card__meta p {
+  margin-bottom: 0.35rem;
+}
+
+.programmer-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 2rem 1rem;
+  margin-bottom: 2rem;
+  background: linear-gradient(160deg, rgba(15, 118, 110, 0.12), transparent 70%);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.2);
+}
+
+.programmer-hero img {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--ifm-color-primary);
+  box-shadow: 0 12px 30px rgba(16, 42, 39, 0.18);
+}
+
+@media screen and (max-width: 768px) {
+  .programmer-card {
+    flex-direction: column;
+    text-align: center;
+  }
 }

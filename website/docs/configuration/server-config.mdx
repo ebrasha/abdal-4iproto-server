@@ -1,0 +1,69 @@
+---
+sidebar_position: 1
+title: Server Configuration
+description: Configure ports, shell, authentication attempts, and server version banner
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : server-config.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : server_config.json documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Server Configuration (`server_config.json`)
+
+`server_config.json` controls listener ports, shell behavior, brute-force thresholds, and the SSH version banner.
+
+## Windows Example
+
+```json
+{
+  "ports": [64235, 64236, 64237],
+  "shell": "cmd.exe",
+  "max_auth_attempts": 3,
+  "server_version": "SSH-2.0-Abdal-4iProto-Server"
+}
+```
+
+## Linux Example
+
+```json
+{
+  "ports": [64235, 64236, 64237],
+  "shell": "/bin/bash",
+  "max_auth_attempts": 3,
+  "server_version": "SSH-2.0-Abdal-4iProto-Server"
+}
+```
+
+## Options Reference
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `ports` | number[] | Ports the server listens on simultaneously |
+| `shell` | string | Shell command for admin shell access (`cmd.exe` on Windows, `/bin/bash` on Linux) |
+| `max_auth_attempts` | number | Failed authentication attempts before IP blocking |
+| `server_version` | string | Custom SSH server version / banner string |
+
+## Notes
+
+- Multi-port listening lets you expose several entry points without running multiple processes
+- Keep `max_auth_attempts` low in public deployments
+- Customize `server_version` when you want to hide default identity fingerprints
+
+## Related
+
+- [Users Configuration](./users)
+- [Blocked IPs](./blocked-ips)
+- [Security Features](../features/security)

@@ -1,0 +1,74 @@
+---
+sidebar_position: 3
+title: Manual Installation
+description: Build and run Abdal 4iProto Server from source
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : installation-manual.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Manual build and run instructions for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Manual Installation
+
+Use this path when you want to build Abdal 4iProto Server from source.
+
+## Prerequisites
+
+- Go `1.25.10` or newer
+- Project source code
+- `id_rsa`, `server_config.json`, and `users.json` in the server directory
+
+See [Requirements](./requirements) and [SSH Key Setup](./ssh-keys).
+
+## 1. Prepare Configuration
+
+Create the JSON configuration files described in:
+
+- [Server Configuration](../configuration/server-config)
+- [Users Configuration](../configuration/users)
+- [Blocked IPs](../configuration/blocked-ips)
+
+## 2. Generate or Place the SSH Key
+
+Place your SSH private key as `id_rsa` in the project directory, or generate one:
+
+```bash
+ssh-keygen -t rsa -b 4096 -f id_rsa
+```
+
+## 3. Build and Run
+
+```bash
+go mod tidy
+go build -o abdal-4iproto-server
+./abdal-4iproto-server
+```
+
+On Windows, the binary name is typically `abdal-4iproto-server.exe`.
+
+## Verify Startup
+
+After launch, confirm that:
+
+- The process listens on the ports defined in `server_config.json`
+- Authentication works with a user from `users.json`
+- Failed login attempts are recorded as expected
+
+## Next Steps
+
+- [Starting the Server](../usage/starting-server)
+- [Connecting to the Server](../usage/connecting)
+- [Clients Overview](../clients/overview)

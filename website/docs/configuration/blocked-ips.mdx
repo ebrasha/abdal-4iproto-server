@@ -1,0 +1,56 @@
+---
+sidebar_position: 3
+title: Blocked IPs
+description: Manage persistently blocked source IP addresses
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : blocked-ips.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : blocked_ips.json documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Blocked IPs (`blocked_ips.json`)
+
+`blocked_ips.json` stores source IP addresses that are persistently blocked, typically after repeated failed authentication attempts.
+
+## Example
+
+```json
+{
+  "blocked": [
+    "192.168.1.12",
+    "10.0.0.7"
+  ]
+}
+```
+
+## Behavior
+
+- Failed logins are evaluated against `max_auth_attempts` in `server_config.json`
+- Offending source IPs can be added to the blocked list
+- The list persists across restarts through JSON storage
+- Detailed failed attempts are also recorded in `invalid_logins.log`
+
+## Operational Tips
+
+- Review blocked entries regularly during active attacks
+- Remove false positives carefully after verification
+- Combine IP blocking with strong passwords and non-default ports
+
+## Related
+
+- [Security Features](../features/security)
+- [Logs](../monitoring/logs)
+- [Server Configuration](./server-config)

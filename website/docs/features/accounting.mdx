@@ -1,0 +1,65 @@
+---
+sidebar_position: 6
+title: Accounting Features
+description: Session control, TTL, rate limiting, and traffic quota enforcement
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : accounting.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Accounting and session control documentation
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Accounting Features
+
+Accounting controls keep concurrent usage, duration, speed, and total consumption within operator-defined limits.
+
+## Built-in Session Control
+
+Administrators define how many concurrent sessions each account may open using `max_sessions`.
+
+## Automatic Session Expiration
+
+Each session has a TTL (`session_ttl_seconds`). Expired sessions are terminated automatically to free resources.
+
+## Dynamic Connection Handling
+
+When the session limit is reached, new connections can be rejected according to policy. If an account is saturated, additional users attempting to connect can be blocked immediately.
+
+## Real-time Session Monitoring
+
+Active sessions are tracked and logged for auditing and operational visibility.
+
+## Rate Limiting
+
+Use `max_speed_kbps` to define per-user transfer speed limits in KB/s. Limits are applied in real time with a Token Bucket algorithm for upload and download.
+
+**Example:** `1024` = 1 MB/s
+
+## Traffic Limit Enforcement
+
+Use `max_total_mb` to define total traffic caps in MB. If a user exceeds quota:
+
+- Access can be denied at login, or
+- An active session can be forcefully disconnected
+
+**Example:** `10240` = 10 GB
+
+## Real-time Bandwidth Enforcement
+
+Traffic usage is checked every 1–2 seconds. When usage exceeds the defined limit, the session is terminated immediately.
+
+## Configure These Fields
+
+All accounting fields are set per user in [Users Configuration](../configuration/users).

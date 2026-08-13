@@ -1,19 +1,14 @@
-facebook:
-  label: Facebook
-  permalink: /facebook
-  description: Facebook tag description
+announcement:
+  label: Announcement
+  permalink: /announcement
+  description: Project announcements for Abdal 4iProto Server
 
-hello:
-  label: Hello
-  permalink: /hello
-  description: Hello tag description
+documentation:
+  label: Documentation
+  permalink: /documentation
+  description: Documentation updates and guides
 
-docusaurus:
-  label: Docusaurus
-  permalink: /docusaurus
-  description: Docusaurus tag description
-
-hola:
-  label: Hola
-  permalink: /hola
-  description: Hola tag description
+security:
+  label: Security
+  permalink: /security
+  description: Security-related notes and updates

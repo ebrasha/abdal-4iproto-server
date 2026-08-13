@@ -1,42 +1,63 @@
+/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : index.tsx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Homepage feature highlights for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */
+
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 
-type FeatureItem = {
+interface FeatureItem {
   title: string;
   Svg: React.ComponentType<React.ComponentProps<'svg'>>;
   description: ReactNode;
-};
+}
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    title: 'Secure by Design',
+    Svg: require('@site/static/img/security.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Protect connections through secure SSH tunneling with built-in brute
+        force protection, automatic IP blocking, attack monitoring, and
+        role-based access control.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'No Runtime Dependencies',
+    Svg: require('@site/static/img/none_depen.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Run the pre-built Abdal 4iProto Server without installing Go or external
+        runtime packages. The CLI automatically prepares the required keys and
+        configuration for you.
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: 'Easy Installation',
+    Svg: require('@site/static/img/easy_install.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Deploy Abdal 4iProto effortlessly with the official CLI. It automatically
+        detects your OS and architecture, verifies SHA-256 checksums, generates
+        SSH keys, configures ports, installs persistent system services, and can
+        install a graphical panel to manage users and full server settings.
       </>
     ),
   },

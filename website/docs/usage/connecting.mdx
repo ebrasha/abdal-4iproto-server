@@ -1,0 +1,50 @@
+---
+sidebar_position: 2
+title: Connecting to the Server
+description: Connect using the official Abdal client or standard SSH dynamic forwarding
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : connecting.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Client connection methods for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Connecting to the Server
+
+## Recommended: Official Custom Client
+
+Abdal provides a dedicated client with GUI support and SOCKS5 server creation. For the best experience, use the official client:
+
+**Download:** [Abdal 4iProto Client](https://github.com/ebrasha/abdal-4iproto-client)
+
+Platform-specific options are listed in [Clients Overview](../clients/overview).
+
+## Alternative: Standard SSH Connection
+
+You can also connect with a standard SSH client using dynamic forwarding:
+
+```bash
+ssh -D 1080 username@server_ip -p 22
+```
+
+Replace:
+
+- `username` with an account from `users.json`
+- `server_ip` with your server address
+- `22` with one of the ports from `server_config.json` when you are not using port 22
+
+## After Connection
+
+Configure applications to use the local SOCKS proxy endpoint exposed by your client. Details are in [SOCKS Proxy Usage](./socks-proxy).

@@ -1,0 +1,57 @@
+---
+sidebar_position: 2
+title: Logs
+description: Security and operational log files used by Abdal 4iProto Server
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : logs.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Logging documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Logs
+
+Abdal 4iProto Server records authentication failures, blocked IPs, and live operational events.
+
+## Key Artifacts
+
+| Artifact | Purpose |
+| --- | --- |
+| `invalid_logins.log` | Failed authentication attempts |
+| `blocked_ips.json` | Persistently blocked source IPs |
+| Console output | Real-time connection and traffic logs |
+
+## Failed Login Logging
+
+`invalid_logins.log` helps you investigate:
+
+- Repeated credential guessing
+- Source IP patterns
+- Targeted usernames
+
+## Blocked IP Persistence
+
+When brute-force thresholds are exceeded, source IPs can be stored in `blocked_ips.json`. See [Blocked IPs](../configuration/blocked-ips).
+
+## Operational Practice
+
+- Review failed-login volume during incidents
+- Correlate traffic files with active session complaints
+- Keep admin shell access tightly controlled
+
+## Related
+
+- [Security Features](../features/security)
+- [Traffic Statistics](./traffic-stats)

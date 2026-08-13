@@ -1,0 +1,54 @@
+---
+sidebar_position: 3
+title: SOCKS Proxy Usage
+description: Route application traffic through the Abdal 4iProto SSH tunnel
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : socks-proxy.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : SOCKS proxy usage guide for Abdal 4iProto tunnels
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# SOCKS Proxy Usage
+
+After a successful tunnel with dynamic forwarding, applications can send traffic through a local SOCKS proxy.
+
+## Typical Flow
+
+1. Connect to Abdal 4iProto Server with an official client or SSH dynamic forwarding
+2. Note the local SOCKS listen port created by the client
+3. Point browsers or apps to that SOCKS endpoint
+4. All matching traffic is tunneled through the secure SSH connection
+
+## Common Local Endpoint
+
+With the Abdal client ecosystem, applications are commonly configured to use:
+
+```text
+localhost:52905
+```
+
+If you create the SOCKS listener yourself (for example with `ssh -D 1080`), use the port you chose.
+
+## Tips
+
+- Prefer the official Abdal clients for integrated SOCKS5 setup
+- Keep destination filters and quotas in mind when testing high-bandwidth apps
+- Validate blocked domains/IPs with a non-admin test account
+
+## Related
+
+- [Connecting to the Server](./connecting)
+- [Clients Overview](../clients/overview)

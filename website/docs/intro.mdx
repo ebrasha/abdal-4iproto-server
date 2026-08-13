@@ -1,47 +1,86 @@
 ---
 sidebar_position: 1
+slug: /intro
+title: Introduction
+description: Overview of Abdal 4iProto Server — high-performance SSH tunneling with security and accounting
 ---
 
-# Tutorial Intro
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : intro.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Introduction page for Abdal 4iProto Server documentation
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
 
-Let's discover **Docusaurus in less than 5 minutes**.
+# Abdal 4iProto Server
 
-## Getting Started
+**Abdal 4iProto Server** is a high-performance SSH-based tunneling server designed for secure internet access, with advanced security controls, traffic monitoring, and built-in accounting.
 
-Get started by **creating a new site**.
+Use this documentation to install, configure, operate, and connect clients to your server across Linux, Windows, Android, and iOS.
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+## What You Can Do
 
-### What you'll need
+- Run a secure SSH tunneling service on multiple ports at once
+- Enforce brute-force protection and persistent IP blocking
+- Track per-user traffic and apply speed/quota limits
+- Control concurrent sessions and session TTL
+- Block unauthorized domains and destination IPs
+- Connect with official Abdal clients or standard SSH tools
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+## Why It Exists
 
-## Generate a new site
+Standard SSH servers are powerful, but operating a dedicated tunneling platform often needs more operational controls: session accounting, rate limits, traffic caps, destination filtering, and attack visibility. Abdal 4iProto Server focuses on those needs while staying fast and practical to deploy.
 
-Generate a new Docusaurus site using the **classic template**.
+## Documentation Map
 
-The classic template will automatically be added to your project after you run the command:
+| Section | Purpose |
+| --- | --- |
+| [Getting Started](./getting-started/requirements) | Requirements, CLI install, manual build, SSH keys |
+| [Configuration](./configuration/server-config) | `server_config.json`, `users.json`, blocked IPs |
+| [Features](./features/overview) | Security, network, monitoring, accounting |
+| [Usage](./usage/starting-server) | Start the server and establish tunnels |
+| [Clients](./clients/overview) | Linux, Windows, Android, and iOS clients |
+| [Guides](./guides/traffic-forwarding) | Full traffic forwarding with iptables |
+| [Monitoring](./monitoring/traffic-stats) | Traffic files and security logs |
+| [Support](./support/programmer) | Issues, donation, programmer, license |
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+## Ecosystem
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+- [Abdal 4iProto CLI](https://github.com/ebrasha/abdal-4iproto-cli) — automated install, service setup, and panel deployment
+- [Abdal 4iProto Panel](https://github.com/ebrasha/abdal-4iproto-panel) — graphical panel to manage users, server settings, traffic monitoring, and logs
+- [Abdal 4iProto Client](https://github.com/ebrasha/abdal-4iproto-client) — desktop client with SOCKS5 support
+- [Abdal 4iProto Android Client](https://github.com/ebrasha/abdal-4iproto-client-android) — official Android client
 
-The command also installs all necessary dependencies you need to run Docusaurus.
+## Programmer
 
-## Start your site
+<div className="programmer-card">
+  <img
+    src="https://avatars.githubusercontent.com/u/9009001?v=4"
+    alt="Ebrahim Shafiei (EbraSha)"
+  />
+  <div className="programmer-card__meta">
+    <h3>Ebrahim Shafiei (EbraSha)</h3>
+    <p>Handcrafted with Passion</p>
+    <p>
+      <a href="mailto:Prof.Shafiei@Gmail.com">Prof.Shafiei@Gmail.com</a>
+      {' · '}
+      <a href="https://t.me/ProfShafiei">Telegram</a>
+      {' · '}
+      <a href="https://github.com/ebrasha">GitHub</a>
+    </p>
+  </div>
+</div>
 
-Run the development server:
+## Next Step
 
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+Start with [Requirements](./getting-started/requirements), then install via the [CLI](./getting-started/installation-cli) or [manual build](./getting-started/installation-manual).

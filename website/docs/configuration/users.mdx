@@ -1,0 +1,123 @@
+---
+sidebar_position: 2
+title: Users Configuration
+description: Define users, roles, filters, session limits, speed caps, and traffic quotas
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : users.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : users.json documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Users Configuration (`users.json`)
+
+`users.json` is the JSON-based authentication and policy database for Abdal 4iProto Server.
+
+## Example
+
+```json
+[
+  {
+    "username": "ebrasha",
+    "password": "152314562152",
+    "role": "admin",
+    "blocked_domains": [],
+    "blocked_ips": [],
+    "log": "no",
+    "max_sessions": 1,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 10240,
+    "max_total_mb": 0
+  },
+  {
+    "username": "user1",
+    "password": "password123",
+    "role": "user",
+    "blocked_domains": [
+      "facebook.com",
+      "*.facebook.com",
+      "twitter.com",
+      "*.twitter.com",
+      "instagram.com",
+      "*.instagram.com"
+    ],
+    "blocked_ips": [
+      "192.168.1.100",
+      "10.0.0.*",
+      "172.16.*.*"
+    ],
+    "log": "yes",
+    "max_sessions": 2,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 10240
+  },
+  {
+    "username": "user2",
+    "password": "password456",
+    "role": "user",
+    "blocked_domains": [
+      "youtube.com",
+      "*.youtube.com",
+      "netflix.com",
+      "*.netflix.com"
+    ],
+    "blocked_ips": [
+      "192.168.10.1",
+      "10.10.10.10"
+    ],
+    "log": "yes",
+    "max_sessions": 5,
+    "session_ttl_seconds": 300,
+    "max_speed_kbps": 512,
+    "max_total_mb": 5120
+  }
+]
+```
+
+## Field Reference
+
+| Field | Description |
+| --- | --- |
+| `username` | Login name |
+| `password` | Login password |
+| `role` | `admin` or `user` |
+| `blocked_domains` | Domains the user cannot visit (supports wildcards like `*.example.com`) |
+| `blocked_ips` | Destination IPs the user cannot reach (supports patterns like `10.0.0.*`) |
+| `log` | `yes` / `no` — enable or disable visited-website tracking for the account |
+| `max_sessions` | Maximum concurrent sessions for the account |
+| `session_ttl_seconds` | Session lifetime in seconds |
+| `max_speed_kbps` | Per-user rate limit in KB/s (Token Bucket) |
+| `max_total_mb` | Total traffic quota in MB (`0` can mean unlimited depending on deployment policy) |
+
+## Roles
+
+- **admin** — can establish tunnels and execute operating system shell commands
+- **user** — can establish tunnels only
+
+:::warning
+Never keep sample passwords in production. Replace every default credential before public exposure.
+:::
+
+## Rate Limit and Quota Examples
+
+- `max_speed_kbps: 1024` → 1 MB/s
+- `max_total_mb: 10240` → 10 GB total quota
+
+## Related
+
+- [Accounting Features](../features/accounting)
+- [Traffic Monitoring](../features/traffic-monitoring)
+- [Security Features](../features/security)

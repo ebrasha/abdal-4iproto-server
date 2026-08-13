@@ -1,0 +1,66 @@
+---
+sidebar_position: 1
+title: Requirements
+description: System and software requirements for running Abdal 4iProto Server
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : requirements.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Requirements documentation for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Requirements
+
+Before installing Abdal 4iProto Server, prepare the following.
+
+## Supported Platforms
+
+- Linux
+- Windows
+
+## Runtime Options
+
+### Option A — Prebuilt binary via CLI (recommended)
+
+If you install with [Abdal 4iProto CLI](https://github.com/ebrasha/abdal-4iproto-cli), you do **not** need Go installed on the target machine. The CLI detects OS/architecture, verifies checksums, prepares keys/config, can register a system service, and can install the **graphical management panel** ([Abdal 4iProto Panel](https://github.com/ebrasha/abdal-4iproto-panel)) so you can manage users and the full server configuration through a GUI.
+
+### Option B — Build from source
+
+For manual builds you need:
+
+- **Go 1.25.10 or higher**
+- An SSH private key named `id_rsa`
+- Configuration files described in the [Configuration](../configuration/server-config) section
+
+## Required Files
+
+| File | Purpose |
+| --- | --- |
+| `id_rsa` | SSH private key used by the server |
+| `server_config.json` | Ports, shell, auth attempts, banner/version |
+| `users.json` | Users, roles, limits, filters |
+| `blocked_ips.json` | Persistently blocked source IPs |
+
+## Network Considerations
+
+- Open the ports listed in `server_config.json` on your firewall
+- Prefer dedicated non-default ports for operational safety
+- Keep admin credentials strong; admin accounts can execute shell commands
+
+## Next Steps
+
+- [Easy Installation via CLI](./installation-cli)
+- [Manual Installation](./installation-manual)
+- [SSH Key Setup](./ssh-keys)

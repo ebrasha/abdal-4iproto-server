@@ -1,0 +1,78 @@
+---
+sidebar_position: 2
+title: Easy Installation via CLI
+description: Install Abdal 4iProto Server using the official Abdal 4iProto CLI
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : installation-cli.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : CLI-based installation guide for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Easy Installation via Abdal 4iProto CLI
+
+[**Abdal 4iProto CLI**](https://github.com/ebrasha/abdal-4iproto-cli) is the recommended way to deploy the server. It is an advanced command-line tool for managing the Abdal 4iProto ecosystem.
+
+## What the CLI Does
+
+- Detects your operating system and CPU architecture
+- Verifies release artifacts with SHA-256 checksums
+- Configures listening ports
+- Generates SSH keys when needed
+- Registers persistent system services
+- Installs the **graphical management panel** so you can manage users and the full server configuration through a GUI
+
+## Graphical Management Panel
+
+With **Abdal 4iProto CLI**, you can also install the graphical panel: [Abdal 4iProto Panel](https://github.com/ebrasha/abdal-4iproto-panel).
+
+After installation, you can manage the platform visually instead of editing JSON files by hand:
+
+- Create, edit, and remove users
+- Adjust roles, session limits, rate limits, and traffic quotas
+- Manage global server settings (ports, shell, auth attempts, banner, and related options)
+- Monitor traffic and review system logs
+- Operate day-to-day administration through a graphical interface
+
+:::tip
+If you prefer a visual workflow, install the panel with Abdal 4iProto CLI and manage users plus the entire server configuration from the GUI. Project repository: [abdal-4iproto-panel](https://github.com/ebrasha/abdal-4iproto-panel).
+:::
+
+## Why Prefer the CLI
+
+Manual builds are useful for development. For production hosts, the CLI reduces setup mistakes and keeps install steps consistent across machines. It also unlocks the graphical panel for easier user and server management.
+
+## Install Flow
+
+1. Download / install the CLI from the [Abdal 4iProto CLI repository](https://github.com/ebrasha/abdal-4iproto-cli)
+2. Follow the CLI prompts to install the server package for your platform
+3. Optionally install the **graphical management panel** when prompted by the CLI
+4. Confirm ports, keys, and service registration
+5. Start or enable the service as instructed by the CLI
+
+:::tip
+After CLI installation, review settings in the graphical panel (or in `server_config.json` / `users.json`) before exposing the service publicly.
+:::
+
+## After Installation
+
+- Open the graphical panel installed by Abdal 4iProto CLI to manage users and server settings
+- Or review [Server Configuration](../configuration/server-config) and [Users Configuration](../configuration/users) manually
+- Connect with an official client from [Clients Overview](../clients/overview)
+
+## Related
+
+- [Manual Installation](./installation-manual)
+- [Requirements](./requirements)

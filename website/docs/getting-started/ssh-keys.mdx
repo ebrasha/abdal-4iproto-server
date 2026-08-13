@@ -1,0 +1,56 @@
+---
+sidebar_position: 4
+title: SSH Key Setup
+description: Generate and place the SSH private key used by Abdal 4iProto Server
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : ssh-keys.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : SSH private key setup for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# SSH Key Setup
+
+Abdal 4iProto Server expects an SSH private key named `id_rsa` in the server directory.
+
+## Generate a New Key
+
+Run this command in the server files directory:
+
+```bash
+ssh-keygen -t rsa -b 4096 -f id_rsa
+```
+
+This creates:
+
+- `id_rsa` — private key used by the server
+- `id_rsa.pub` — public key companion file
+
+## Placement Rules
+
+- Keep `id_rsa` next to the server binary / project files
+- Protect private key permissions on Linux (`chmod 600 id_rsa` is recommended)
+- Do not commit private keys to public repositories
+
+## Operational Notes
+
+- The official CLI can generate keys during installation
+- Rotate keys when a host is compromised or decommissioned
+- After key changes, restart the server process or service
+
+## Next Steps
+
+- [Manual Installation](./installation-manual)
+- [Server Configuration](../configuration/server-config)

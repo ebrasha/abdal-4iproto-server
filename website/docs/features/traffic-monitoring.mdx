@@ -1,0 +1,53 @@
+---
+sidebar_position: 3
+title: Traffic Monitoring
+description: Real-time traffic tracking, persistence, and destination visibility
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : traffic-monitoring.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-13 16:21:05
+ * Description : Traffic monitoring features for Abdal 4iProto Server
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Traffic Monitoring
+
+The server continuously tracks usage so operators can measure consumption and enforce policy.
+
+## Capabilities
+
+- **Real-time traffic tracking** — upload/download usage per user
+- **Session-based statistics** — bytes sent/received per session
+- **Total usage analytics** — cumulative counters across sessions
+- **Automatic data persistence** — traffic data saved to JSON about every 10 seconds
+- **Live bandwidth monitoring** — real-time bandwidth visibility
+- **Unauthorized website blocking** — deny domains you do not want users to visit
+- **Unauthorized IP blocking** — deny destination IPs you do not want users to reach
+- **Visited website tracking** — optional per-user logging (`log: "yes"` / `"no"`)
+
+## What Is Tracked
+
+- Bytes sent and received per session
+- Total traffic per user
+- Session timestamps
+- Real-time bandwidth usage
+
+## Persistence
+
+Traffic snapshots are written to files such as `traffic_username.json`. See [Traffic Statistics](../monitoring/traffic-stats) for the schema.
+
+## Related
+
+- [Accounting Features](./accounting)
+- [Users Configuration](../configuration/users)
