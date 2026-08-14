@@ -3,6 +3,6 @@
   "position": 7,
   "link": {
     "type": "generated-index",
-    "description": "Operational guides such as full traffic forwarding with iptables."
+    "description": "Operational guides: iptables full traffic forwarding and Abdal 4iProto Proxy Multi-Hop."
   }
 }

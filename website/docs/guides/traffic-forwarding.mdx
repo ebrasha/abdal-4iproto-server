@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
-title: Full Traffic Forwarding
-description: Forward all traffic from a Linux relay to Abdal 4iProto Server using iptables NAT
+title: Full Traffic Forwarding (iptables)
+description: Forward all traffic from a Linux relay to Abdal 4iProto Server using iptables NAT and MASQUERADE
 ---
 
 {/*
@@ -21,14 +21,18 @@ description: Forward all traffic from a Linux relay to Abdal 4iProto Server usin
  **********************************************************************
  */}
 
-# Complete Traffic Forwarding Guide
+# Complete Traffic Forwarding Guide (iptables)
 
-This guide explains how to use IP forwarding and iptables NAT to redirect incoming traffic from a Linux relay server to a 4iProto destination server. Typical use cases include full traffic forwarding, transparent proxy setups, and gateway relay designs.
+This guide explains how to use **IP forwarding** and **iptables NAT** to redirect incoming traffic from a Linux relay server to a 4iProto destination server. Typical use cases include full traffic forwarding, transparent proxy setups, and gateway relay designs.
+
+:::info Alternative
+For a dedicated Abdal 4iProto Multi-Hop TCP/UDP proxy (without writing iptables rules yourself), see [Abdal 4iProto Proxy Multi-Hop](./abdal-4iproto-proxy).
+:::
 
 <p align="center">
   <img
     src="/img/masquerade.jpg"
-    alt="Complete Traffic Forwarding Guide from an Entry Server to 4iProto Server"
+    alt="Complete Traffic Forwarding Guide from an Entry Server to 4iProto Server using iptables"
     width="100%"
   />
 </p>
@@ -81,5 +85,6 @@ iptables -t nat -A POSTROUTING -j MASQUERADE
 
 ## Related
 
+- [Abdal 4iProto Proxy Multi-Hop](./abdal-4iproto-proxy)
 - [Network Capabilities](../features/network)
 - [Starting the Server](../usage/starting-server)

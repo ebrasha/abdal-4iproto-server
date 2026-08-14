@@ -150,6 +150,14 @@ const config: Config = {
               href: 'https://github.com/ebrasha/abdal-4iproto-panel',
             },
             {
+              label: '4iProto Proxy',
+              href: 'https://github.com/ebrasha/abdal-4iproto-proxy',
+            },
+            {
+              label: 'SSH KeyGen',
+              href: 'https://github.com/ebrasha/abdal-4iproto-server-ssh-keygen',
+            },
+            {
               label: 'Desktop Client',
               href: 'https://github.com/ebrasha/abdal-4iproto-client',
             },

@@ -1,0 +1,267 @@
+---
+sidebar_position: 2
+title: Abdal 4iProto Proxy Multi-Hop
+description: Nested Multi-Hop TCP/UDP proxy built for the Abdal 4iProto ecosystem
+---
+
+{/*
+ **********************************************************************
+ * -------------------------------------------------------------------
+ * Project Name : Abdal 4iProto Server
+ * File Name : abdal-4iproto-proxy.mdx
+ * Programmer : Ebrahim Shafiei (EbraSha)
+ * Email : Prof.Shafiei@Gmail.com
+ * Created On : 2026-08-15 01:23:49
+ * Description : Multi-Hop Abdal 4iProto Proxy guide for nested TCP/UDP relays
+ * -------------------------------------------------------------------
+ *
+ * "Coding is an engaging and beloved hobby for me. I passionately and insatiably pursue knowledge in cybersecurity and programming."
+ * – Ebrahim Shafiei
+ *
+ **********************************************************************
+ */}
+
+# Abdal 4iProto Proxy (Multi-Hop)
+
+[**Abdal 4iProto Proxy**](https://github.com/ebrasha/abdal-4iproto-proxy) is a high-performance, transparent **TCP/UDP** proxy designed to sit in front of backend services — including **Abdal 4iProto Server** — and forward traffic safely and efficiently.
+
+It is built specifically for the Abdal 4iProto ecosystem and supports nested **Multi-Hop** deployments:
+
+```text
+Client → Proxy A → Proxy B → Target
+```
+
+<p align="center">
+  <img
+    src="/img/abdal-4iproto-proxy.webp"
+    alt="Abdal 4iProto Proxy Multi-Hop architecture"
+    width="100%"
+  />
+</p>
+
+:::tip
+Prefer a dedicated Abdal proxy over manual iptables when you need independent TCP/UDP paths, access control, and Multi-Hop chaining. For classic Linux NAT gateway rules, see [Full Traffic Forwarding (iptables)](./traffic-forwarding).
+:::
+
+## Why This Software Was Created
+
+Abdal 4iProto Proxy solves a practical networking problem:
+
+- You need a **protocol-agnostic** relay that does not inspect or rewrite application payloads
+- You want **independent TCP and UDP** forwarding paths
+- You need basic **security controls** (connection limits, IP filtering, flood protection at application level)
+- You may chain multiple proxy instances: `Client → Proxy A → Proxy B → Target`
+
+For Abdal 4iProto SSH / `direct-udpip` traffic, this proxy treats the stream as **plain TCP bytes** and forwards them unchanged. Separately, it also provides a full **native RAW UDP** relay for applications that send real UDP datagrams.
+
+## Part of the Abdal 4iProto Ecosystem
+
+Abdal 4iProto Proxy is designed to work alongside Abdal 4iProto Client/Server as a transparent hop, without becoming an application-layer parser for 4iProto itself.
+
+### Ecosystem Benefits
+
+- **Hiding the original client IP from the destination** — the destination usually sees the IP of the last proxy or the 4iProto server
+- **Harder traffic attribution** — correlating traffic back to the real origin typically requires reconstructing a multi-hop path
+- **Network separation per hop** — each hop only observes its own inbound/outbound relationship
+- **Content security for 4iProto traffic** — when traffic travels inside SSH/4iProto, proxies only relay encrypted payloads
+- **Higher analysis cost with Multi-Hop** — chaining proxies increases the cost of traffic analysis and path reconstruction
+
+Typical ecosystem path:
+
+```text
+4iProto Client
+      |
+      v
+Proxy Hop A  --->  Proxy Hop B  --->  Proxy Hop C
+      |
+      v
+4iProto Server / Final Target
+```
+
+## Features
+
+### Core Proxying
+
+- Independent TCP proxy (`TCP → TCP`)
+- Independent UDP proxy (`UDP → UDP`)
+- Enable/disable TCP and UDP separately via config
+- Multi-port listening on both protocols
+- Transparent, binary-safe forwarding (no payload rewriting)
+- Compatible with chained proxy deployments
+
+### TCP Path
+
+- Full-duplex TCP relay
+- Idle timeout support
+- Protocol-agnostic byte-stream forwarding
+- Suitable for SSH / 4iProto TCP tunnels without parsing SSH or `direct-udpip`
+
+### UDP Path
+
+- Session-based stateful UDP associations (`Client IP + Source Port`)
+- One persistent upstream socket per association (NAT-friendly)
+- Multi-response UDP support (`1 request → N responses`)
+- Exact datagram preservation (including zero-length datagrams)
+- Large receive buffer (`65535` bytes) to reduce truncation risk
+- Identity-safe session lifecycle
+
+### Security
+
+- Max connections per IP
+- Max total connections
+- Application-level connection flood auto-blacklist
+- Static whitelist / blacklist (IP or CIDR)
+- Dynamic blacklist with TTL
+- Optional loop-prevention checks
+
+### Operations
+
+- JSON configuration file
+- Colored console logging
+- Graceful shutdown
+- Windows / Linux service install support
+- Cross-platform Go build
+
+## How It Works
+
+```text
+                     +-> TCP relay -> Target TCP
+Client -> Proxy -----|
+                     +-> UDP relay -> Target UDP
+```
+
+### Path A — Abdal 4iProto over TCP
+
+```text
+4iProto Client
+      |
+      | SSH/TCP (may contain direct-udpip inside)
+      v
+Abdal 4iProto Proxy
+      |
+      | unchanged TCP byte stream
+      v
+Abdal 4iProto Server
+```
+
+The proxy does **not** parse SSH, does **not** implement `direct-udpip`, and does **not** add/remove framing.
+
+### Path B — Native RAW UDP
+
+```text
+UDP Application
+      |
+      | native UDP datagrams
+      v
+Abdal 4iProto Proxy
+      |
+      | unchanged UDP datagrams
+      v
+UDP Target / next proxy hop
+```
+
+Each client endpoint creates one UDP association. Packets are forwarded verbatim. Upstream responses are continuously relayed back to the same client endpoint.
+
+## How to Use
+
+### Requirements
+
+- Go **1.21+** (for building from source)
+- A writable directory for the binary and config file
+
+### Build
+
+```bash
+go build -o abdal-4iproto-proxy .
+```
+
+### Configure
+
+Edit `abdal-4iproto-proxy.json`:
+
+```json
+{
+  "server_ip": "192.168.10.10",
+  "enable_tcp_proxy": true,
+  "enable_udp_proxy": true,
+  "tcp_ports": [42690],
+  "udp_ports": [42690],
+  "security": {
+    "max_connections_per_ip": 50,
+    "max_total_connections": 2000,
+    "enable_connection_flood_protection": true,
+    "tcp_idle_timeout_seconds": 300,
+    "udp_association_timeout_seconds": 60,
+    "enable_loop_prevention": true,
+    "blacklist_entry_ttl_seconds": 3600
+  },
+  "access_control": {
+    "whitelist": ["10.0.0.0/8"],
+    "blacklist": ["1.2.3.4"]
+  }
+}
+```
+
+### Run
+
+```bash
+./abdal-4iproto-proxy
+```
+
+Or with a custom config path:
+
+```bash
+./abdal-4iproto-proxy -config /path/to/abdal-4iproto-proxy.json
+```
+
+### Service Mode
+
+```bash
+# Install as system service
+./abdal-4iproto-proxy -install-service
+
+# Run as service
+./abdal-4iproto-proxy -service
+
+# Uninstall service
+./abdal-4iproto-proxy -uninstall-service
+```
+
+## Configuration Reference
+
+| Key | Description |
+| --- | --- |
+| `server_ip` | Upstream/target server IP or hostname |
+| `enable_tcp_proxy` | Independently enable/disable TCP proxy |
+| `enable_udp_proxy` | Independently enable/disable UDP proxy |
+| `tcp_ports` | Local TCP listen ports to forward |
+| `udp_ports` | Local UDP listen ports to forward |
+| `max_connections_per_ip` | Per-IP active connection/session limit |
+| `max_total_connections` | Global active connection/session limit |
+| `enable_connection_flood_protection` | Auto-blacklist IPs that hit per-IP limits |
+| `tcp_idle_timeout_seconds` | TCP idle timeout |
+| `udp_association_timeout_seconds` | RAW UDP association idle timeout |
+| `enable_loop_prevention` | Detect obvious localhost proxy loops |
+| `blacklist_entry_ttl_seconds` | Dynamic blacklist lifetime |
+| `access_control.whitelist` | Always-allowed IPs/CIDRs |
+| `access_control.blacklist` | Always-blocked IPs/CIDRs |
+
+### Useful Examples
+
+- **TCP only:** `"enable_tcp_proxy": true`, `"enable_udp_proxy": false`
+- **UDP only:** `"enable_tcp_proxy": false`, `"enable_udp_proxy": true`
+- **Both:** keep both flags `true`
+
+:::warning
+`udp_association_timeout_seconds` belongs to this proxy’s RAW UDP associations. It is **not** the Abdal 4iProto Server SSH `direct-udpip` idle timeout.
+:::
+
+## Repository
+
+- GitHub: [https://github.com/ebrasha/abdal-4iproto-proxy](https://github.com/ebrasha/abdal-4iproto-proxy)
+
+## Related
+
+- [Full Traffic Forwarding (iptables)](./traffic-forwarding)
+- [Network Capabilities](../features/network)
+- [Connecting to the Server](../usage/connecting)

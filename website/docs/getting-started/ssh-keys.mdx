@@ -11,7 +11,7 @@ description: Generate and place the SSH private key used by Abdal 4iProto Server
  * File Name : ssh-keys.mdx
  * Programmer : Ebrahim Shafiei (EbraSha)
  * Email : Prof.Shafiei@Gmail.com
- * Created On : 2026-08-13 16:21:05
+ * Created On : 2026-08-15 01:23:49
  * Description : SSH private key setup for Abdal 4iProto Server
  * -------------------------------------------------------------------
  *
@@ -25,7 +25,34 @@ description: Generate and place the SSH private key used by Abdal 4iProto Server
 
 Abdal 4iProto Server expects an SSH private key named `id_rsa` in the server directory.
 
-## Generate a New Key
+## Recommended: Abdal 4iProto Server SSH KeyGen
+
+For an interactive, user-friendly key generator with progress bar and algorithm selection, use the official ecosystem tool:
+
+- 🔐 **[Abdal 4iProto Server SSH KeyGen](https://github.com/ebrasha/abdal-4iproto-server-ssh-keygen)**
+
+A powerful and interactive SSH key generation tool with a beautiful progress bar and user-friendly interface. It is designed to generate SSH keys for Abdal 4iProto Server and supports:
+
+- Interactive algorithm selection (RSA, ED25519, ECDSA)
+- Non-interactive CLI flags for automation
+- Progress bar and overwrite confirmation
+- Automatic file naming based on selected algorithm
+
+```bash
+git clone https://github.com/ebrasha/abdal-4iproto-server-ssh-keygen.git
+cd abdal-4iproto-server-ssh-keygen
+go mod tidy
+go build -o abdal-4iproto-server-ssh-keygen .
+./abdal-4iproto-server-ssh-keygen
+```
+
+Example non-interactive RSA generation:
+
+```bash
+./abdal-4iproto-server-ssh-keygen -t rsa -b 4096
+```
+
+## Alternative: OpenSSH `ssh-keygen`
 
 Run this command in the server files directory:
 
@@ -47,6 +74,7 @@ This creates:
 ## Operational Notes
 
 - The official CLI can generate keys during installation
+- Prefer [Abdal 4iProto Server SSH KeyGen](https://github.com/ebrasha/abdal-4iproto-server-ssh-keygen) when you want an interactive workflow
 - Rotate keys when a host is compromised or decommissioned
 - After key changes, restart the server process or service
 
